@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bash INI Parser - A robust INI configuration file parser for Bash</title>
+    <!-- Add highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/bash.min.js"></script>
+    <!-- jQuery Terminal dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/jquery.terminal/css/jquery.terminal.min.css"/>
+    <script src="https://unpkg.com/jquery.terminal/js/jquery.terminal.min.js"></script>
+    <script src="https://unpkg.com/js-polyfills/keyboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        });
+    </script>
+    <style>
+        :root {
+            --primary-color: #0366d6;
+            --secondary-color: #24292e;
+            --accent-color: #2ea44f;
+            --text-color: #24292e;
+            --light-bg: #f6f8fa;
+            --border-color: #e1e4e8;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        h1, h2, h3, h4 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        h1 {
+            font-size: 2em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+        
+        h2 {
+            font-size: 1.5em;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        pre {
+            background-color: var(--light-bg);
+            border-radius: 6px;
+            padding: 16px;
+            overflow: auto;
+        }
+        
+        code {
+            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        
+        code:not(pre code) {
+            background-color: var(--light-bg);
+            border-radius: 3px;
+            padding: 0.2em 0.4em;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .feature-list li {
+            background-color: var(--light-bg);
+            border-radius: 6px;
+            padding: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .project-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .project-meta div {
+            background-color: var(--light-bg);
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 0.9em;
+            color: #6a737d;
+        }
+        
+        /* Terminal styling */
+        #terminal-container {
+            margin: 30px 0;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .terminal {
+            --size: 1.2;
+            padding: 10px;
+            height: 400px;
+        }
+        
+        .terminal-toolbar {
+            display: flex;
+            justify-content: space-between;
+            background-color: #383838;
+            padding: 8px 15px;
+        }
+        
+        .terminal-title {
+            color: white;
+            font-weight: bold;
+        }
+        
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .terminal-buttons span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .terminal-close {
+            background-color: #ff5f56;
+        }
+        
+        .terminal-minimize {
+            background-color: #ffbd2e;
+        }
+        
+        .terminal-maximize {
+            background-color: #27c93f;
+        }
+        
+        .try-it-title {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Bash INI Parser</h1>
+        <p>A robust shell script library for parsing and manipulating INI configuration files in Bash.</p>
+        <div class="project-meta">
+            <div><strong>Version:</strong> 0.0.1</div>
+            <div><strong>License:</strong> BSD</div>
+            <div><strong>Author:</strong> <a href="https://leandrosf.com" target="_blank">Leandro Ferreira</a></div>
+            <div><strong>GitHub:</strong> <a href="https://github.com/lsferreira42/bash-ini-parser" target="_blank">lsferreira42/bash-ini-parser</a></div>
+        </div>
+    </header>
+
+    <section>
+        <h2 class="try-it-title">Try It Now</h2>
+        <p>Experiment with the bash-ini-parser library directly in your browser! The terminal below has the library and example files pre-loaded.</p>
+        
+        <div id="terminal-container">
+            <div class="terminal-toolbar">
+                <div class="terminal-buttons">
+                    <span class="terminal-close"></span>
+                    <span class="terminal-minimize"></span>
+                    <span class="terminal-maximize"></span>
+                </div>
+                <div class="terminal-title">bash-ini-parser demo</div>
+                <div></div>
+            </div>
+            <div id="terminal"></div>
+        </div>
+        
+        <p><strong>Tip:</strong> Try these commands to get started:</p>
+        <ul>
+            <li><code>ls</code> - List available files</li>
+            <li><code>cat lib_ini.sh</code> - View the library source</li>
+            <li><code>ls examples</code> - See example files</li>
+            <li><code>cat examples/simple.ini</code> - View a sample INI file</li>
+            <li><code>./run_demo.sh</code> - Run a demonstration script</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Features</h2>
+        <ul class="feature-list">
+            <li><strong>Read and write</strong> values from/to INI files</li>
+            <li><strong>List sections and keys</strong> in INI files</li>
+            <li><strong>Add, update, and remove</strong> sections and keys</li>
+            <li><strong>Support for complex values</strong> including quotes, spaces, and special characters</li>
+            <li><strong>Array support</strong> for storing multiple values</li>
+            <li><strong>Import/export functionality</strong> between files and environment variables</li>
+            <li><strong>Extensive error handling</strong> with detailed error messages</li>
+            <li><strong>Debug mode</strong> for troubleshooting</li>
+            <li><strong>Configurable behavior</strong> through environment variables</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Installation</h2>
+        <p>Simply include the <code>lib_ini.sh</code> script in your project and source it in your shell scripts:</p>
+        <pre><code class="language-bash">source /path/to/lib_ini.sh</code></pre>
+        
+        <h3>Download Options</h3>
+        <p>Clone the repository:</p>
+        <pre><code class="language-bash">git clone https://github.com/lsferreira42/bash-ini-parser.git</code></pre>
+        
+        <p>Or download the script directly:</p>
+        <pre><code class="language-bash">curl -o lib_ini.sh https://raw.githubusercontent.com/lsferreira42/bash-ini-parser/main/lib_ini.sh</code></pre>
+    </section>
+
+    <section>
+        <h2>Basic Usage</h2>
+        <p>Here's a simple example of how to use the library:</p>
+        <pre><code class="language-bash">#!/bin/bash
+source ./lib_ini.sh
+
+# Create a new INI file with sections and keys
+CONFIG_FILE="config.ini"
+ini_add_section "$CONFIG_FILE" "app"
+ini_write "$CONFIG_FILE" "app" "name" "My Application"
+ini_write "$CONFIG_FILE" "app" "version" "1.0.0"
+
+# Read values
+app_name=$(ini_read "$CONFIG_FILE" "app" "name")
+echo "App name: $app_name"
+
+# List sections and keys
+echo "Available sections:"
+ini_list_sections "$CONFIG_FILE" | while read section; do
+    echo "- $section"
+    echo "  Keys:"
+    ini_list_keys "$CONFIG_FILE" "$section" | while read key; do
+        value=$(ini_read "$CONFIG_FILE" "$section" "$key")
+        echo "  - $key = $value"
+    done
+done
+
+# Remove a key
+ini_remove_key "$CONFIG_FILE" "app" "name"
+
+# Remove a section
+ini_remove_section "$CONFIG_FILE" "app"</code></pre>
+    </section>
+
+    <section>
+        <h2>Advanced Features</h2>
+
+        <h3>Array Support</h3>
+        <pre><code class="language-bash"># Write array values
+ini_write_array "$CONFIG_FILE" "app" "supported_formats" "jpg" "png" "gif"
+
+# Read array values
+formats=$(ini_read_array "$CONFIG_FILE" "app" "supported_formats")
+for format in $formats; do
+    echo "Format: $format"
+done</code></pre>
+
+        <h3>Default Values</h3>
+        <pre><code class="language-bash"># Get a value or use a default if not found
+timeout=$(ini_get_or_default "$CONFIG_FILE" "app" "timeout" "30")</code></pre>
+
+        <h3>Environment Variables Export</h3>
+        <pre><code class="language-bash"># Export all INI values to environment variables with a prefix
+ini_to_env "$CONFIG_FILE" "CFG"
+echo "App name from env: $CFG_app_name"
+
+# Export only one section
+ini_to_env "$CONFIG_FILE" "CFG" "database"</code></pre>
+
+        <h3>File Import</h3>
+        <pre><code class="language-bash"># Import all values from one INI file to another
+ini_import "defaults.ini" "config.ini"
+
+# Import only specific sections
+ini_import "defaults.ini" "config.ini" "section1" "section2"</code></pre>
+
+        <h3>Key Existence Check</h3>
+        <pre><code class="language-bash">if ini_key_exists "config.ini" "app" "version"; then
+    echo "The key exists"
+fi</code></pre>
+    </section>
+
+    <section>
+        <h2>Configuration Options</h2>
+        <p>The library's behavior can be customized by setting these variables either directly in your script after sourcing the library or as environment variables before sourcing the library:</p>
+
+        <h3>Method 1: Set in your script after sourcing</h3>
+        <pre><code class="language-bash">source ./lib_ini.sh
+INI_DEBUG=1</code></pre>
+
+        <h3>Method 2: Set as environment variables before sourcing</h3>
+        <pre><code class="language-bash">export INI_DEBUG=1
+source ./lib_ini.sh</code></pre>
+
+        <h3>Available configuration options:</h3>
+        <pre><code class="language-bash"># Enable debug mode to see detailed operations
+INI_DEBUG=1
+
+# Enable strict validation of section and key names
+INI_STRICT=1
+
+# Allow empty values
+INI_ALLOW_EMPTY_VALUES=1
+
+# Allow spaces in section and key names
+INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
+    </section>
+
+    <section>
+        <h2>Examples</h2>
+        <p>Check the <a href="https://github.com/lsferreira42/bash-ini-parser/tree/main/examples">examples directory</a> for complete usage examples:</p>
+        <ul>
+            <li><a href="https://github.com/lsferreira42/bash-ini-parser/blob/main/examples/basic_usage.sh">basic_usage.sh</a>: Demonstrates core functionality</li>
+            <li><a href="https://github.com/lsferreira42/bash-ini-parser/blob/main/examples/advanced_usage.sh">advanced_usage.sh</a>: Shows advanced features</li>
+        </ul>
+    </section>
+
+    <footer>
+        <p>Copyright © 2023 Leandro Ferreira. This project is licensed under the <a href="https://github.com/lsferreira42/bash-ini-parser/blob/main/LICENSE">BSD License</a>.</p>
+    </footer>
+
+    <script>
+        // Filesystem simulation
+        const filesystem = {
+            '/': {
+                'lib_ini.sh': `<!-- LIB_INI_SH_CONTENT -->`,
+                'simple.ini': `<!-- SIMPLE_INI_CONTENT -->`,
+                'complex.ini': `<!-- COMPLEX_INI_CONTENT -->`,
+                'empty.ini': `<!-- EMPTY_INI_CONTENT -->`,
+                'examples': {
+                    'simple.ini': `<!-- EXAMPLES_SIMPLE_INI_CONTENT -->`,
+                    'complex.ini': `<!-- EXAMPLES_COMPLEX_INI_CONTENT -->`,
+                    'empty.ini': `<!-- EXAMPLES_EMPTY_INI_CONTENT -->`,
+                    'basic_usage.sh': `<!-- EXAMPLES_BASIC_USAGE_SH_CONTENT -->`,
+                },
+                'run_demo.sh': `<!-- RUN_DEMO_SH_CONTENT -->`,
+                'config.ini': `<!-- CONFIG_INI_CONTENT -->`
+            }
+        };
+        
+        // Current directory path
+        let currentPath = '/';
+        
+        // Library functions that are sourced
+        let sourceEnv = {
+            ini_read: undefined,
+            ini_write: undefined,
+            ini_add_section: undefined,
+            ini_list_sections: undefined,
+            ini_list_keys: undefined,
+            ini_write_array: undefined,
+            ini_read_array: undefined
+        };
+        
+        // Terminal initialization
+        $(function() {
+            $('#terminal').terminal(function(command) {
+                if (command.trim() === '') {
+                    return;
+                }
+                
+                // Parse the command
+                const parts = command.trim().split(/\s+/);
+                const cmd = parts[0];
+                const args = parts.slice(1);
+                
+                // Basic command handling
+                switch (cmd) {
+                    case 'cd':
+                        changeDirectory(args[0] || '/');
+                        break;
+                    case 'ls':
+                        listDirectory(args[0] || currentPath);
+                        break;
+                    case 'pwd':
+                        this.echo(currentPath);
+                        break;
+                    case 'cat':
+                        catFile(args[0]);
+                        break;
+                    case 'source':
+                        sourceFile(args[0], this);
+                        break;
+                    case './run_demo.sh':
+                        runDemo();
+                        break;
+                    case 'clear':
+                        this.clear();
+                        break;
+                    case 'help':
+                        showHelp();
+                        break;
+                    default:
+                        // Check if this is a sourced function
+                        if (sourceEnv[cmd]) {
+                            executeFunctionFromSourceEnv(cmd, args, this);
+                        } else {
+                            this.echo(`Command not found: ${cmd}\nType 'help' to see available commands.`);
+                        }
+                }
+            }, {
+                greetings: 'Bash INI Parser Interactive Demo\nType "help" to see available commands.\n\n[[;#82b366;]Note: lib_ini.sh has been pre-loaded for your convenience!]',
+                prompt: '[[;#76d275;]user@bash-ini-parser]:[[;#4dacf5;]' + currentPath + ']$ ',
+                name: 'bash-ini-parser-demo',
+                height: 400,
+                scrollOnEcho: true
+            });
+
+            // Automatically source lib_ini.sh at startup
+            sourceFile('lib_ini.sh', $('#terminal').terminal());
+            
+            // Helper functions for the terminal
+            function resolvePath(path) {
+                // If it's an absolute path
+                if (path.startsWith('/')) {
+                    return path;
+                }
+                
+                // Handle relative paths
+                let resolvedPath = currentPath;
+                const segments = path.split('/');
+                
+                for (const segment of segments) {
+                    if (segment === '' || segment === '.') {
+                        continue;
+                    }
+                    if (segment === '..') {
+                        // Go up one directory
+                        if (resolvedPath !== '/') {
+                            resolvedPath = resolvedPath.replace(/\/[^\/]+\/?$/, '/');
+                            if (resolvedPath === '') resolvedPath = '/';
+                        }
+                    } else {
+                        // Go into directory
+                        resolvedPath = resolvedPath + (resolvedPath.endsWith('/') ? '' : '/') + segment;
+                    }
+                }
+                
+                return resolvedPath;
+            }
+            
+            function getContents(path) {
+                if (path === '/') return filesystem['/'];
+                
+                const parts = path.split('/').filter(p => p);
+                let current = filesystem['/'];
+                
+                for (const part of parts) {
+                    if (!current[part]) return null;
+                    current = current[part];
+                }
+                
+                return current;
+            }
+            
+            function changeDirectory(path) {
+                const terminal = $('#terminal').terminal();
+                const resolvedPath = resolvePath(path);
+                const contents = getContents(resolvedPath);
+                
+                if (!contents || typeof contents !== 'object') {
+                    terminal.error(`cd: ${path}: Not a directory`);
+                    return;
+                }
+                
+                currentPath = resolvedPath;
+                // Update prompt
+                terminal.set_prompt('[[;#76d275;]user@bash-ini-parser]:[[;#4dacf5;]' + currentPath + ']$ ');
+            }
+            
+            function listDirectory(path) {
+                const terminal = $('#terminal').terminal();
+                const resolvedPath = resolvePath(path);
+                const contents = getContents(resolvedPath);
+                
+                if (!contents || typeof contents !== 'object') {
+                    terminal.error(`ls: ${path}: No such directory`);
+                    return;
+                }
+                
+                // Display directories and files
+                const items = Object.keys(contents).sort();
+                let output = '';
+                
+                for (const item of items) {
+                    if (typeof contents[item] === 'object') {
+                        output += `[[;#4dacf5;]${item}/] `;
+                    } else {
+                        output += `${item} `;
+                    }
+                }
+                
+                terminal.echo(output);
+            }
+            
+            function catFile(path) {
+                const terminal = $('#terminal').terminal();
+                if (!path) {
+                    terminal.error('Usage: cat <filename>');
+                    return;
+                }
+                
+                const resolvedPath = resolvePath(path);
+                let filePath = resolvedPath;
+                let contents;
+                
+                // Special case for files in current directory
+                if (!resolvedPath.includes('/')) {
+                    const currentContents = getContents(currentPath);
+                    contents = currentContents[path];
+                    filePath = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${path}`;
+                } else {
+                    // Handle full paths
+                    const parts = resolvedPath.split('/').filter(p => p);
+                    const fileName = parts.pop();
+                    const dirPath = '/' + parts.join('/');
+                    const dirContents = getContents(dirPath);
+                    
+                    if (dirContents && dirContents[fileName]) {
+                        contents = dirContents[fileName];
+                    }
+                }
+                
+                if (typeof contents === 'string') {
+                    terminal.echo(contents);
+                } else if (typeof contents === 'object') {
+                    terminal.error(`cat: ${path}: Is a directory`);
+                } else {
+                    terminal.error(`cat: ${path}: No such file`);
+                }
+            }
+
+            function sourceFile(path, terminal) {
+                if (!path) {
+                    terminal.error('Usage: source <filename>');
+                    return;
+                }
+                
+                const resolvedPath = resolvePath(path);
+                let filePath = resolvedPath;
+                let contents;
+                
+                // Special case for files in current directory
+                if (!resolvedPath.includes('/')) {
+                    const currentContents = getContents(currentPath);
+                    contents = currentContents[path];
+                    filePath = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${path}`;
+                } else {
+                    // Handle full paths
+                    const parts = resolvedPath.split('/').filter(p => p);
+                    const fileName = parts.pop();
+                    const dirPath = '/' + parts.join('/');
+                    const dirContents = getContents(dirPath);
+                    
+                    if (dirContents && dirContents[fileName]) {
+                        contents = dirContents[fileName];
+                    }
+                }
+                
+                if (typeof contents === 'string') {
+                    // Extract function definitions and add to sourceEnv
+                    const functionMatches = contents.match(/function\s+(\w+)\(\)/g);
+                    if (functionMatches) {
+                        functionMatches.forEach(match => {
+                            const funcName = match.match(/function\s+(\w+)/)[1];
+                            sourceEnv[funcName] = true;
+                        });
+                        terminal.echo(`Sourced ${path} - functions loaded: ${Object.keys(sourceEnv).filter(k => sourceEnv[k]).join(', ')}`);
+                    } else {
+                        terminal.echo(`Sourced ${path} - no functions found`);
+                    }
+                } else {
+                    terminal.error(`source: ${path}: No such file`);
+                }
+            }
+
+            function executeFunctionFromSourceEnv(funcName, args, terminal) {
+                // This simulates calling a sourced function
+                switch (funcName) {
+                    case 'ini_read':
+                        if (args.length < 3) {
+                            terminal.error('Usage: ini_read <file> <section> <key>');
+                            return;
+                        }
+                        terminal.echo(`Reading [${args[1]}].${args[2]} from ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'name') {
+                            terminal.echo('Meu Aplicativo');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'version') {
+                            terminal.echo('1.0.0');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'debug') {
+                            terminal.echo('false');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'database' && args[2] === 'host') {
+                            terminal.echo('localhost');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'descrição') {
+                            terminal.echo('Este é um sistema complexo com várias funcionalidades');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'versão') {
+                            terminal.echo('2.0.0');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'configurações' && args[2] === 'diretório de dados') {
+                            terminal.echo('C:\\Programa Files\\Sistema\\data');
+                        } else {
+                            terminal.error('Value not found');
+                        }
+                        break;
+                    
+                    case 'ini_list_sections':
+                        if (args.length < 1) {
+                            terminal.error('Usage: ini_list_sections <file>');
+                            return;
+                        }
+                        terminal.echo(`Listing sections in ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini') {
+                            terminal.echo('app');
+                            terminal.echo('database');
+                        } else if (args[0] === 'complex.ini') {
+                            terminal.echo('sistema');
+                            terminal.echo('configurações');
+                        } else if (args[0] === 'empty.ini') {
+                            terminal.echo('No sections found');
+                        }
+                        break;
+                    
+                    case 'ini_list_keys':
+                        if (args.length < 2) {
+                            terminal.error('Usage: ini_list_keys <file> <section>');
+                            return;
+                        }
+                        terminal.echo(`Listing keys in [${args[1]}] from ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini' && args[1] === 'app') {
+                            terminal.echo('name');
+                            terminal.echo('version');
+                            terminal.echo('debug');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'database') {
+                            terminal.echo('host');
+                            terminal.echo('port');
+                            terminal.echo('user');
+                            terminal.echo('password');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema') {
+                            terminal.echo('descrição');
+                            terminal.echo('versão');
+                        } else {
+                            terminal.error('Section not found');
+                        }
+                        break;
+                    
+                    default:
+                        terminal.echo(`Function ${funcName} is available but not fully implemented in this demo.`);
+                }
+            }
+            
+            function runDemo() {
+                const terminal = $('#terminal').terminal();
+                const demo = filesystem['/']['run_demo.sh'];
+                
+                // Execute the demo script line by line
+                terminal.echo('[[;#82b366;]Running demo script...]');
+                terminal.echo('');
+                
+                const lines = demo.split('\n');
+                let i = 0;
+                
+                function processNextLine() {
+                    if (i < lines.length) {
+                        const line = lines[i++].trim();
+                        
+                        // Skip comments and empty lines
+                        if (line.startsWith('#') || line === '') {
+                            processNextLine();
+                            return;
+                        }
+                        
+                        terminal.echo(`\$ ${line}`);
+                        
+                        // Simulate command execution
+                        if (line.startsWith('echo')) {
+                            // Just echo the text
+                            const text = line.substring(5).replace(/^"|"$/g, '');
+                            terminal.echo(text);
+                            setTimeout(processNextLine, 500);
+                        } else if (line.includes('ini_')) {
+                            // Handle INI functions
+                            setTimeout(() => {
+                                simulateIniFunction(line);
+                                processNextLine();
+                            }, 800);
+                        } else if (line.includes('source')) {
+                            // Handle source command
+                            setTimeout(() => {
+                                terminal.echo('Sourced lib_ini.sh - functions loaded successfully');
+                                processNextLine();
+                            }, 500);
+                        } else {
+                            // Other commands
+                            setTimeout(processNextLine, 300);
+                        }
+                    }
+                }
+                
+                processNextLine();
+            }
+            
+            function simulateIniFunction(line) {
+                const terminal = $('#terminal').terminal();
+                
+                if (line.includes('ini_add_section')) {
+                    terminal.echo('Section added successfully.');
+                } else if (line.includes('ini_write')) {
+                    terminal.echo('Value written successfully.');
+                } else if (line.includes('ini_read') && !line.includes('ini_read_array')) {
+                    if (line.includes('app_name')) {
+                        terminal.echo('My Application');
+                    } else if (line.includes('app_version')) {
+                        terminal.echo('1.0.0');
+                    }
+                } else if (line.includes('ini_list_sections')) {
+                    terminal.echo('app');
+                } else if (line.includes('ini_list_keys')) {
+                    terminal.echo('name');
+                    terminal.echo('version');
+                    if (line.includes('while read')) {
+                        terminal.echo('supported_formats');
+                    }
+                } else if (line.includes('ini_write_array')) {
+                    terminal.echo('Array written successfully.');
+                } else if (line.includes('ini_read_array')) {
+                    terminal.echo('jpg');
+                    terminal.echo('png');
+                    terminal.echo('gif');
+                }
+            }
+            
+            function showHelp() {
+                const terminal = $('#terminal').terminal();
+                terminal.echo('Available commands:');
+                terminal.echo('  ls [path]          - List files in the specified directory');
+                terminal.echo('  cd [path]          - Change to the specified directory');
+                terminal.echo('  pwd                - Print current directory');
+                terminal.echo('  cat <file>         - Display file contents');
+                terminal.echo('  source <file>      - Source a script to load its functions');
+                terminal.echo('  ./run_demo.sh      - Run the demonstration script');
+                terminal.echo('  clear              - Clear the terminal screen');
+                terminal.echo('  help               - Show this help message');
+                terminal.echo('');
+                terminal.echo('Available INI functions (already loaded):');
+                terminal.echo('  ini_read <file> <section> <key>          - Read a value');
+                terminal.echo('  ini_list_sections <file>                 - List sections');
+                terminal.echo('  ini_list_keys <file> <section>           - List keys in a section');
+            }
+        });
+    </script>
+</body>
+</html> 
