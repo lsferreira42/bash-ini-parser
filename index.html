@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bash INI Parser - A robust INI configuration file parser for Bash</title>
+    <!-- Add highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/bash.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        });
+    </script>
     <style>
         :root {
             --primary-color: #0366d6;
@@ -62,16 +73,22 @@
             border-radius: 6px;
             padding: 16px;
             overflow: auto;
+        }
+        
+        code {
             font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
             font-size: 85%;
         }
         
-        code {
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        
+        code:not(pre code) {
             background-color: var(--light-bg);
             border-radius: 3px;
             padding: 0.2em 0.4em;
-            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 85%;
         }
         
         .feature-list {
@@ -89,21 +106,6 @@
             border-left: 4px solid var(--primary-color);
         }
         
-        .btn {
-            display: inline-block;
-            padding: 8px 16px;
-            background-color: var(--accent-color);
-            color: white;
-            border-radius: 6px;
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-        
-        .btn:hover {
-            background-color: #2c974b;
-            text-decoration: none;
-        }
-
         .project-meta {
             display: flex;
             gap: 20px;
@@ -137,7 +139,6 @@
             <div><strong>Author:</strong> <a href="https://leandrosf.com" target="_blank">Leandro Ferreira</a></div>
             <div><strong>GitHub:</strong> <a href="https://github.com/lsferreira42/bash-ini-parser" target="_blank">lsferreira42/bash-ini-parser</a></div>
         </div>
-        <a href="https://github.com/lsferreira42/bash-ini-parser" class="btn">View on GitHub</a>
     </header>
 
     <section>
@@ -152,27 +153,26 @@
             <li><strong>Extensive error handling</strong> with detailed error messages</li>
             <li><strong>Debug mode</strong> for troubleshooting</li>
             <li><strong>Configurable behavior</strong> through environment variables</li>
-            <li><strong>Backwards compatible</strong> with previous versions</li>
         </ul>
     </section>
 
     <section>
         <h2>Installation</h2>
         <p>Simply include the <code>lib_ini.sh</code> script in your project and source it in your shell scripts:</p>
-        <pre>source /path/to/lib_ini.sh</pre>
+        <pre><code class="language-bash">source /path/to/lib_ini.sh</code></pre>
         
         <h3>Download Options</h3>
         <p>Clone the repository:</p>
-        <pre>git clone https://github.com/lsferreira42/bash-ini-parser.git</pre>
+        <pre><code class="language-bash">git clone https://github.com/lsferreira42/bash-ini-parser.git</code></pre>
         
         <p>Or download the script directly:</p>
-        <pre>curl -o lib_ini.sh https://raw.githubusercontent.com/lsferreira42/bash-ini-parser/main/lib_ini.sh</pre>
+        <pre><code class="language-bash">curl -o lib_ini.sh https://raw.githubusercontent.com/lsferreira42/bash-ini-parser/main/lib_ini.sh</code></pre>
     </section>
 
     <section>
         <h2>Basic Usage</h2>
         <p>Here's a simple example of how to use the library:</p>
-        <pre>#!/bin/bash
+        <pre><code class="language-bash">#!/bin/bash
 source ./lib_ini.sh
 
 # Create a new INI file with sections and keys
@@ -200,45 +200,45 @@ done
 ini_remove_key "$CONFIG_FILE" "app" "name"
 
 # Remove a section
-ini_remove_section "$CONFIG_FILE" "app"</pre>
+ini_remove_section "$CONFIG_FILE" "app"</code></pre>
     </section>
 
     <section>
         <h2>Advanced Features</h2>
 
         <h3>Array Support</h3>
-        <pre># Write array values
+        <pre><code class="language-bash"># Write array values
 ini_write_array "$CONFIG_FILE" "app" "supported_formats" "jpg" "png" "gif"
 
 # Read array values
 formats=$(ini_read_array "$CONFIG_FILE" "app" "supported_formats")
 for format in $formats; do
     echo "Format: $format"
-done</pre>
+done</code></pre>
 
         <h3>Default Values</h3>
-        <pre># Get a value or use a default if not found
-timeout=$(ini_get_or_default "$CONFIG_FILE" "app" "timeout" "30")</pre>
+        <pre><code class="language-bash"># Get a value or use a default if not found
+timeout=$(ini_get_or_default "$CONFIG_FILE" "app" "timeout" "30")</code></pre>
 
         <h3>Environment Variables Export</h3>
-        <pre># Export all INI values to environment variables with a prefix
+        <pre><code class="language-bash"># Export all INI values to environment variables with a prefix
 ini_to_env "$CONFIG_FILE" "CFG"
 echo "App name from env: $CFG_app_name"
 
 # Export only one section
-ini_to_env "$CONFIG_FILE" "CFG" "database"</pre>
+ini_to_env "$CONFIG_FILE" "CFG" "database"</code></pre>
 
         <h3>File Import</h3>
-        <pre># Import all values from one INI file to another
+        <pre><code class="language-bash"># Import all values from one INI file to another
 ini_import "defaults.ini" "config.ini"
 
 # Import only specific sections
-ini_import "defaults.ini" "config.ini" "section1" "section2"</pre>
+ini_import "defaults.ini" "config.ini" "section1" "section2"</code></pre>
 
         <h3>Key Existence Check</h3>
-        <pre>if ini_key_exists "config.ini" "app" "version"; then
+        <pre><code class="language-bash">if ini_key_exists "config.ini" "app" "version"; then
     echo "The key exists"
-fi</pre>
+fi</code></pre>
     </section>
 
     <section>
@@ -246,15 +246,15 @@ fi</pre>
         <p>The library's behavior can be customized by setting these variables either directly in your script after sourcing the library or as environment variables before sourcing the library:</p>
 
         <h3>Method 1: Set in your script after sourcing</h3>
-        <pre>source ./lib_ini.sh
-INI_DEBUG=1</pre>
+        <pre><code class="language-bash">source ./lib_ini.sh
+INI_DEBUG=1</code></pre>
 
         <h3>Method 2: Set as environment variables before sourcing</h3>
-        <pre>export INI_DEBUG=1
-source ./lib_ini.sh</pre>
+        <pre><code class="language-bash">export INI_DEBUG=1
+source ./lib_ini.sh</code></pre>
 
         <h3>Available configuration options:</h3>
-        <pre># Enable debug mode to see detailed operations
+        <pre><code class="language-bash"># Enable debug mode to see detailed operations
 INI_DEBUG=1
 
 # Enable strict validation of section and key names
@@ -264,7 +264,7 @@ INI_STRICT=1
 INI_ALLOW_EMPTY_VALUES=1
 
 # Allow spaces in section and key names
-INI_ALLOW_SPACES_IN_NAMES=1</pre>
+INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
     </section>
 
     <section>
