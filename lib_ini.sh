@@ -4,9 +4,10 @@
 # ==============================================================================
 # A lightweight library for manipulating INI configuration files in Bash scripts
 #
-# Author: [Your Name]
-# Version: 1.1.0
-# License: MIT
+# Author: Leandro Ferreira (https://leandrosf.com)
+# Version: 0.0.1
+# License: BSD
+# GitHub: https://github.com/lsferreira42
 # ==============================================================================
 
 # Configuration

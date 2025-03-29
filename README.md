@@ -2,6 +2,11 @@
 
 A robust shell script library for parsing and manipulating INI configuration files in Bash.
 
+- **Version:** 0.0.1
+- **Author:** Leandro Ferreira
+- **Website:** [leandrosf.com](https://leandrosf.com)
+- **GitHub:** [lsferreira42](https://github.com/lsferreira42)
+
 ## Features
 
 - **Read and write** values from/to INI files
@@ -211,10 +216,17 @@ Check the `examples` directory for complete usage examples:
 - `basic_usage.sh`: Demonstrates core functionality
 - `advanced_usage.sh`: Shows advanced features
 
-## Compatibility
-
-All enhancements maintain compatibility with previous versions. Strict mode is disabled by default, and the new functions do not interfere with the operation of existing code.
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the BSD License, a permissive free software license with minimal restrictions on the use and distribution of covered software.
+
+## Author
+
+- **Leandro Ferreira**
+- Website: [leandrosf.com](https://leandrosf.com)
+- GitHub: [lsferreira42](https://github.com/lsferreira42)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. 
