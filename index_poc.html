@@ -473,6 +473,25 @@ function ini_read_array() {
         return 1
     fi
 }`,
+                'simple.ini': `[app]
+name=Meu Aplicativo
+version=1.0.0
+debug=false
+
+[database]
+host=localhost
+port=3306
+user=root
+password=p4ssw0rd`,
+                'complex.ini': `[sistema]
+descrição=Este é um sistema complexo com várias funcionalidades
+versão=2.0.0
+
+[configurações]
+diretório de dados=C:\\Programa Files\\Sistema\\data
+URL=https://sistema.exemplo.com.br/api?token=abc123`,
+                'empty.ini': `# This is an empty configuration file
+# Add your settings here`,
                 'examples': {
                     'simple.ini': `[app]
 name=Meu Aplicativo
@@ -579,6 +598,17 @@ supported_formats=jpg,png,gif`
         // Current directory path
         let currentPath = '/';
         
+        // Library functions that are sourced
+        let sourceEnv = {
+            ini_read: undefined,
+            ini_write: undefined,
+            ini_add_section: undefined,
+            ini_list_sections: undefined,
+            ini_list_keys: undefined,
+            ini_write_array: undefined,
+            ini_read_array: undefined
+        };
+        
         // Terminal initialization
         $(function() {
             $('#terminal').terminal(function(command) {
@@ -605,6 +635,9 @@ supported_formats=jpg,png,gif`
                     case 'cat':
                         catFile(args[0]);
                         break;
+                    case 'source':
+                        sourceFile(args[0], this);
+                        break;
                     case './run_demo.sh':
                         runDemo();
                         break;
@@ -615,15 +648,23 @@ supported_formats=jpg,png,gif`
                         showHelp();
                         break;
                     default:
-                        this.echo(`Command not found: ${cmd}\nType 'help' to see available commands.`);
+                        // Check if this is a sourced function
+                        if (sourceEnv[cmd]) {
+                            executeFunctionFromSourceEnv(cmd, args, this);
+                        } else {
+                            this.echo(`Command not found: ${cmd}\nType 'help' to see available commands.`);
+                        }
                 }
             }, {
-                greetings: 'Bash INI Parser Interactive Demo\nType "help" to see available commands.',
+                greetings: 'Bash INI Parser Interactive Demo\nType "help" to see available commands.\n\n[[;#82b366;]Note: lib_ini.sh has been pre-loaded for your convenience!]',
                 prompt: '[[;#76d275;]user@bash-ini-parser]:[[;#4dacf5;]' + currentPath + ']$ ',
                 name: 'bash-ini-parser-demo',
                 height: 400,
                 scrollOnEcho: true
             });
+
+            // Automatically source lib_ini.sh at startup
+            sourceFile('lib_ini.sh', $('#terminal').terminal());
             
             // Helper functions for the terminal
             function resolvePath(path) {
@@ -745,6 +786,126 @@ supported_formats=jpg,png,gif`
                     terminal.error(`cat: ${path}: No such file`);
                 }
             }
+
+            function sourceFile(path, terminal) {
+                if (!path) {
+                    terminal.error('Usage: source <filename>');
+                    return;
+                }
+                
+                const resolvedPath = resolvePath(path);
+                let filePath = resolvedPath;
+                let contents;
+                
+                // Special case for files in current directory
+                if (!resolvedPath.includes('/')) {
+                    const currentContents = getContents(currentPath);
+                    contents = currentContents[path];
+                    filePath = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${path}`;
+                } else {
+                    // Handle full paths
+                    const parts = resolvedPath.split('/').filter(p => p);
+                    const fileName = parts.pop();
+                    const dirPath = '/' + parts.join('/');
+                    const dirContents = getContents(dirPath);
+                    
+                    if (dirContents && dirContents[fileName]) {
+                        contents = dirContents[fileName];
+                    }
+                }
+                
+                if (typeof contents === 'string') {
+                    // Extract function definitions and add to sourceEnv
+                    const functionMatches = contents.match(/function\s+(\w+)\(\)/g);
+                    if (functionMatches) {
+                        functionMatches.forEach(match => {
+                            const funcName = match.match(/function\s+(\w+)/)[1];
+                            sourceEnv[funcName] = true;
+                        });
+                        terminal.echo(`Sourced ${path} - functions loaded: ${Object.keys(sourceEnv).filter(k => sourceEnv[k]).join(', ')}`);
+                    } else {
+                        terminal.echo(`Sourced ${path} - no functions found`);
+                    }
+                } else {
+                    terminal.error(`source: ${path}: No such file`);
+                }
+            }
+
+            function executeFunctionFromSourceEnv(funcName, args, terminal) {
+                // This simulates calling a sourced function
+                switch (funcName) {
+                    case 'ini_read':
+                        if (args.length < 3) {
+                            terminal.error('Usage: ini_read <file> <section> <key>');
+                            return;
+                        }
+                        terminal.echo(`Reading [${args[1]}].${args[2]} from ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'name') {
+                            terminal.echo('Meu Aplicativo');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'version') {
+                            terminal.echo('1.0.0');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'debug') {
+                            terminal.echo('false');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'database' && args[2] === 'host') {
+                            terminal.echo('localhost');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'descrição') {
+                            terminal.echo('Este é um sistema complexo com várias funcionalidades');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'versão') {
+                            terminal.echo('2.0.0');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'configurações' && args[2] === 'diretório de dados') {
+                            terminal.echo('C:\\Programa Files\\Sistema\\data');
+                        } else {
+                            terminal.error('Value not found');
+                        }
+                        break;
+                    
+                    case 'ini_list_sections':
+                        if (args.length < 1) {
+                            terminal.error('Usage: ini_list_sections <file>');
+                            return;
+                        }
+                        terminal.echo(`Listing sections in ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini') {
+                            terminal.echo('app');
+                            terminal.echo('database');
+                        } else if (args[0] === 'complex.ini') {
+                            terminal.echo('sistema');
+                            terminal.echo('configurações');
+                        } else if (args[0] === 'empty.ini') {
+                            terminal.echo('No sections found');
+                        }
+                        break;
+                    
+                    case 'ini_list_keys':
+                        if (args.length < 2) {
+                            terminal.error('Usage: ini_list_keys <file> <section>');
+                            return;
+                        }
+                        terminal.echo(`Listing keys in [${args[1]}] from ${args[0]}...`);
+                        
+                        if (args[0] === 'simple.ini' && args[1] === 'app') {
+                            terminal.echo('name');
+                            terminal.echo('version');
+                            terminal.echo('debug');
+                        } else if (args[0] === 'simple.ini' && args[1] === 'database') {
+                            terminal.echo('host');
+                            terminal.echo('port');
+                            terminal.echo('user');
+                            terminal.echo('password');
+                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema') {
+                            terminal.echo('descrição');
+                            terminal.echo('versão');
+                        } else {
+                            terminal.error('Section not found');
+                        }
+                        break;
+                    
+                    default:
+                        terminal.echo(`Function ${funcName} is available but not fully implemented in this demo.`);
+                }
+            }
             
             function runDemo() {
                 const terminal = $('#terminal').terminal();
@@ -781,6 +942,12 @@ supported_formats=jpg,png,gif`
                                 simulateIniFunction(line);
                                 processNextLine();
                             }, 800);
+                        } else if (line.includes('source')) {
+                            // Handle source command
+                            setTimeout(() => {
+                                terminal.echo('Sourced lib_ini.sh - functions loaded successfully');
+                                processNextLine();
+                            }, 500);
                         } else {
                             // Other commands
                             setTimeout(processNextLine, 300);
@@ -828,9 +995,15 @@ supported_formats=jpg,png,gif`
                 terminal.echo('  cd [path]          - Change to the specified directory');
                 terminal.echo('  pwd                - Print current directory');
                 terminal.echo('  cat <file>         - Display file contents');
+                terminal.echo('  source <file>      - Source a script to load its functions');
                 terminal.echo('  ./run_demo.sh      - Run the demonstration script');
                 terminal.echo('  clear              - Clear the terminal screen');
                 terminal.echo('  help               - Show this help message');
+                terminal.echo('');
+                terminal.echo('Available INI functions (already loaded):');
+                terminal.echo('  ini_read <file> <section> <key>          - Read a value');
+                terminal.echo('  ini_list_sections <file>                 - List sections');
+                terminal.echo('  ini_list_keys <file> <section>           - List keys in a section');
             }
         });
     </script>
