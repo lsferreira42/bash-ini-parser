@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Build script to generate index_poc.html from template_poc.html
-# This script reads the actual files from the repository and embeds them into the template
+# This script uses Node.js to read repository files and embed them into the template
 
 # Exit on error
 set -e
@@ -14,62 +14,23 @@ if [ ! -f "template_poc.html" ]; then
     exit 1
 fi
 
-# Create a copy of the template
-cp template_poc.html index_poc.html
-
-# Function to safely escape content for JavaScript
-escape_content() {
-    # Escape backslashes, backticks, and dollar signs
-    sed -e 's/\\/\\\\/g' -e 's/`/\\`/g' -e 's/\$/\\$/g' "$1"
-}
-
-# Replace placeholders with actual file contents
-if [ -f "lib_ini.sh" ]; then
-    LIB_CONTENT=$(escape_content "lib_ini.sh")
-    sed -i.bak "s|<!-- LIB_INI_SH_CONTENT -->|$LIB_CONTENT|g" index_poc.html
-else
-    echo "Warning: lib_ini.sh not found!"
+# Check if Node.js is available
+if ! command -v node >/dev/null 2>&1; then
+    echo "Error: Node.js is required for this script to work properly."
+    echo "Please install Node.js and try again."
+    exit 1
 fi
 
-# Example INI files
-if [ -f "examples/simple.ini" ]; then
-    SIMPLE_INI_CONTENT=$(escape_content "examples/simple.ini")
-    sed -i.bak "s|<!-- EXAMPLES_SIMPLE_INI_CONTENT -->|$SIMPLE_INI_CONTENT|g" index_poc.html
-    sed -i.bak "s|<!-- SIMPLE_INI_CONTENT -->|$SIMPLE_INI_CONTENT|g" index_poc.html
-else
-    echo "Warning: examples/simple.ini not found!"
+# Create default files if needed
+if [ ! -d "examples" ]; then
+    echo "Creating examples directory..."
+    mkdir -p examples
 fi
 
-if [ -f "examples/complex.ini" ]; then
-    COMPLEX_INI_CONTENT=$(escape_content "examples/complex.ini")
-    sed -i.bak "s|<!-- EXAMPLES_COMPLEX_INI_CONTENT -->|$COMPLEX_INI_CONTENT|g" index_poc.html
-    sed -i.bak "s|<!-- COMPLEX_INI_CONTENT -->|$COMPLEX_INI_CONTENT|g" index_poc.html
-else
-    echo "Warning: examples/complex.ini not found!"
-fi
-
-if [ -f "examples/empty.ini" ]; then
-    EMPTY_INI_CONTENT=$(escape_content "examples/empty.ini")
-    sed -i.bak "s|<!-- EXAMPLES_EMPTY_INI_CONTENT -->|$EMPTY_INI_CONTENT|g" index_poc.html
-    sed -i.bak "s|<!-- EMPTY_INI_CONTENT -->|$EMPTY_INI_CONTENT|g" index_poc.html
-else
-    echo "Warning: examples/empty.ini not found!"
-fi
-
-if [ -f "examples/basic_usage.sh" ]; then
-    BASIC_USAGE_SH_CONTENT=$(escape_content "examples/basic_usage.sh")
-    sed -i.bak "s|<!-- EXAMPLES_BASIC_USAGE_SH_CONTENT -->|$BASIC_USAGE_SH_CONTENT|g" index_poc.html
-else
-    echo "Warning: examples/basic_usage.sh not found!"
-fi
-
-# Demo script
-if [ -f "examples/demo.sh" ]; then
-    RUN_DEMO_SH_CONTENT=$(escape_content "examples/demo.sh")
-    sed -i.bak "s|<!-- RUN_DEMO_SH_CONTENT -->|$RUN_DEMO_SH_CONTENT|g" index_poc.html
-else
-    # Create a default demo script if none exists
-    RUN_DEMO_SH_CONTENT='#!/bin/bash
+if [ ! -f "examples/demo.sh" ]; then
+    echo "Creating default demo script..."
+    cat > examples/demo.sh << 'EOF'
+#!/bin/bash
 # Demo script for bash-ini-parser
 
 # Source the library
@@ -102,7 +63,7 @@ done
 
 # List keys in a section
 echo
-echo "Listing keys in '"'"'app'"'"' section:"
+echo "Listing keys in 'app' section:"
 ini_list_keys "$CONFIG_FILE" "app" | while read key; do
     echo "- $key"
 done
@@ -120,23 +81,101 @@ ini_read_array "$CONFIG_FILE" "app" "supported_formats" | while read format; do
 done
 
 echo
-echo "Demo completed successfully!"'
-    
-    # Escape the content
-    RUN_DEMO_SH_CONTENT=$(echo "$RUN_DEMO_SH_CONTENT" | sed -e 's/\\/\\\\/g' -e 's/`/\\`/g' -e 's/\$/\\$/g')
-    sed -i.bak "s|<!-- RUN_DEMO_SH_CONTENT -->|$RUN_DEMO_SH_CONTENT|g" index_poc.html
+echo "Demo completed successfully!"
+EOF
 fi
 
-# Default config.ini
-CONFIG_INI_CONTENT='[app]
-name=My Application
-version=1.0.0
-supported_formats=jpg,png,gif'
-CONFIG_INI_CONTENT=$(echo "$CONFIG_INI_CONTENT" | sed -e 's/\\/\\\\/g' -e 's/`/\\`/g' -e 's/\$/\\$/g')
-sed -i.bak "s|<!-- CONFIG_INI_CONTENT -->|$CONFIG_INI_CONTENT|g" index_poc.html
+# Create a new approach using Node.js to build the HTML file
+echo "Creating a more robust build script..."
+cat > build_web_temp.js << 'EOF'
+const fs = require('fs');
+const path = require('path');
 
-# Clean up backup files
-rm -f index_poc.html.bak
+// File paths configuration
+const files = {
+  template: 'template_poc.html',
+  output: 'index_poc.html',
+  lib: 'lib_ini.sh',
+  config: {
+    content: '[app]\nname=My Application\nversion=1.0.0\nsupported_formats=jpg,png,gif'
+  },
+  examples: {
+    dir: 'examples',
+    files: ['simple.ini', 'complex.ini', 'empty.ini', 'basic_usage.sh', 'demo.sh']
+  }
+};
 
-echo "Build complete! index_poc.html has been generated."
+// Read the template file
+console.log('Reading template file...');
+let templateContent = fs.readFileSync(files.template, 'utf8');
+
+// Helper function to safely read a file
+function readFileOrDefault(filePath, defaultContent = '') {
+  try {
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath, 'utf8');
+    }
+    return defaultContent;
+  } catch (err) {
+    console.log(`Warning: Could not read ${filePath}: ${err.message}`);
+    return defaultContent;
+  }
+}
+
+// This is the proper way to safely insert file content into JavaScript string literals
+// Using JSON.stringify ensures all special characters are properly escaped
+function safeReplaceInHTML(html, placeholder, content) {
+  // The JSON.stringify handles escaping of all special characters
+  const safeContent = JSON.stringify(content).slice(1, -1);
+  return html.replace(placeholder, safeContent);
+}
+
+// Process lib_ini.sh
+console.log('Processing lib_ini.sh...');
+const libContent = readFileOrDefault(files.lib);
+templateContent = safeReplaceInHTML(templateContent, '<!-- LIB_INI_SH_CONTENT -->', libContent);
+
+// Process example files
+console.log('Processing example files...');
+const examplesDir = files.examples.dir;
+for (const file of files.examples.files) {
+  const filePath = path.join(examplesDir, file);
+  console.log(`Reading ${filePath}...`);
+  const content = readFileOrDefault(filePath);
+  
+  // Replace placeholder in examples directory
+  const examplesPlaceholder = `<!-- EXAMPLES_${file.toUpperCase().replace(/\./g, '_')}_CONTENT -->`;
+  templateContent = safeReplaceInHTML(templateContent, examplesPlaceholder, content);
+  
+  // Also replace in root directory for INI files
+  if (file.endsWith('.ini')) {
+    const rootPlaceholder = `<!-- ${file.toUpperCase().replace(/\./g, '_')}_CONTENT -->`;
+    templateContent = safeReplaceInHTML(templateContent, rootPlaceholder, content);
+  }
+  
+  // Handle demo.sh separately
+  if (file === 'demo.sh') {
+    templateContent = safeReplaceInHTML(templateContent, '<!-- RUN_DEMO_SH_CONTENT -->', content);
+  }
+}
+
+// Add config.ini content
+console.log('Adding config.ini content...');
+templateContent = safeReplaceInHTML(templateContent, '<!-- CONFIG_INI_CONTENT -->', files.config.content);
+
+// Write the final file
+console.log('Writing output file...');
+fs.writeFileSync(files.output, templateContent);
+
+console.log('Build completed successfully!');
+EOF
+
+# Run the Node.js build script
+echo "Running build script..."
+node build_web_temp.js
+
+# Clean up temporary file
+rm build_web_temp.js
+
+echo "Build complete! index_poc.html has been generated with proper escaping."
 echo "All repository files have been embedded and lib_ini.sh is pre-loaded." 

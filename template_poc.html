@@ -13,6 +13,11 @@
     <link rel="stylesheet" href="https://unpkg.com/jquery.terminal/css/jquery.terminal.min.css"/>
     <script src="https://unpkg.com/jquery.terminal/js/jquery.terminal.min.js"></script>
     <script src="https://unpkg.com/js-polyfills/keyboard.js"></script>
+    <!-- Include xterm.js for terminal emulation -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <!-- Include WebAssembly bash environment -->
+    <script src="https://cdn.jsdelivr.net/npm/wasi-js@latest/dist/browser/index.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
             document.querySelectorAll('pre code').forEach((block) => {
@@ -37,6 +42,7 @@
             max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
+            overflow-anchor: none; /* Prevenir rolagem automática */
         }
         
         header {
@@ -139,19 +145,42 @@
             border-radius: 6px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative; /* Changed from static to relative */
+            height: 450px; /* Altura fixa para evitar que o terminal mude de tamanho */
+            overflow-anchor: none; /* Desabilitar ancora de rolagem */
         }
         
-        .terminal {
-            --size: 1.2;
-            padding: 10px;
-            height: 400px;
-        }
-        
+        /* Botões e barra de ferramentas do terminal */
         .terminal-toolbar {
             display: flex;
             justify-content: space-between;
             background-color: #383838;
             padding: 8px 15px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        /* Estilo para o terminal real */
+        #terminal {
+            width: 100%;
+            height: 400px; /* Altura fixa */
+            overflow-anchor: none; 
+            position: relative; /* Changed from static to relative */
+            z-index: 5; /* Added z-index */
+        }
+        
+        /* Regra para prevenir rolagem automática na página */
+        .terminal-active {
+            overflow: hidden !important;
+        }
+        
+        /* Impedir que a seleção de texto afete o comportamento do terminal */
+        .xterm {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
         
         .terminal-title {
@@ -188,6 +217,14 @@
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
         }
+
+        .message-box {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 6px;
+            background-color: #f3f9f4;
+            border-left: 4px solid #2ea44f;
+        }
     </style>
 </head>
 <body>
@@ -204,7 +241,19 @@
 
     <section>
         <h2 class="try-it-title">Try It Now</h2>
-        <p>Experiment with the bash-ini-parser library directly in your browser! The terminal below has the library and example files pre-loaded.</p>
+        <p>Experiment with the bash-ini-parser library directly in your browser! The terminal below has access to all example files.</p>
+        
+        <div class="message-box">
+            <h3>Como usar:</h3>
+            <p>Para testar a biblioteca, execute estes comandos:</p>
+            <ol>
+                <li><code>ls</code> - Para listar os arquivos disponíveis</li>
+                <li><code>cat lib_ini.sh</code> - Para visualizar o código da biblioteca</li>
+                <li><code>source lib_ini.sh</code> - Para carregar a biblioteca na sessão atual</li>
+                <li><code>cat examples/simple.ini</code> - Para ver um arquivo INI de exemplo</li>
+                <li>Agora você pode usar comandos como <code>ini_read simple.ini app name</code></li>
+            </ol>
+        </div>
         
         <div id="terminal-container">
             <div class="terminal-toolbar">
@@ -218,15 +267,6 @@
             </div>
             <div id="terminal"></div>
         </div>
-        
-        <p><strong>Tip:</strong> Try these commands to get started:</p>
-        <ul>
-            <li><code>ls</code> - List available files</li>
-            <li><code>cat lib_ini.sh</code> - View the library source</li>
-            <li><code>ls examples</code> - See example files</li>
-            <li><code>cat examples/simple.ini</code> - View a sample INI file</li>
-            <li><code>./run_demo.sh</code> - Run a demonstration script</li>
-        </ul>
     </section>
 
     <section>
@@ -369,433 +409,550 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
     </footer>
 
     <script>
-        // Filesystem simulation
-        const filesystem = {
-            '/': {
-                'lib_ini.sh': `<!-- LIB_INI_SH_CONTENT -->`,
-                'simple.ini': `<!-- SIMPLE_INI_CONTENT -->`,
-                'complex.ini': `<!-- COMPLEX_INI_CONTENT -->`,
-                'empty.ini': `<!-- EMPTY_INI_CONTENT -->`,
-                'examples': {
-                    'simple.ini': `<!-- EXAMPLES_SIMPLE_INI_CONTENT -->`,
-                    'complex.ini': `<!-- EXAMPLES_COMPLEX_INI_CONTENT -->`,
-                    'empty.ini': `<!-- EXAMPLES_EMPTY_INI_CONTENT -->`,
-                    'basic_usage.sh': `<!-- EXAMPLES_BASIC_USAGE_SH_CONTENT -->`,
+        // Sistema de arquivos e arquivos embutidos
+        const filesData = {
+            'lib_ini.sh': "<!-- LIB_INI_SH_CONTENT -->",
+            'simple.ini': "<!-- SIMPLE_INI_CONTENT -->",
+            'complex.ini': "<!-- COMPLEX_INI_CONTENT -->",
+            'empty.ini': "<!-- EMPTY_INI_CONTENT -->",
+            'examples/simple.ini': "<!-- EXAMPLES_SIMPLE_INI_CONTENT -->",
+            'examples/complex.ini': "<!-- EXAMPLES_COMPLEX_INI_CONTENT -->",
+            'examples/empty.ini': "<!-- EXAMPLES_EMPTY_INI_CONTENT -->",
+            'examples/basic_usage.sh': "<!-- EXAMPLES_BASIC_USAGE_SH_CONTENT -->",
+            'run_demo.sh': "<!-- RUN_DEMO_SH_CONTENT -->",
+            'config.ini': "<!-- CONFIG_INI_CONTENT -->"
+        };
+
+        // Configuração e inicialização do terminal
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar o terminal com configurações adequadas
+            const terminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                theme: {
+                    background: '#282c34',
+                    foreground: '#abb2bf',
+                    cursor: '#528bff'
                 },
-                'run_demo.sh': `<!-- RUN_DEMO_SH_CONTENT -->`,
-                'config.ini': `<!-- CONFIG_INI_CONTENT -->`
-            }
-        };
-        
-        // Current directory path
-        let currentPath = '/';
-        
-        // Library functions that are sourced
-        let sourceEnv = {
-            ini_read: undefined,
-            ini_write: undefined,
-            ini_add_section: undefined,
-            ini_list_sections: undefined,
-            ini_list_keys: undefined,
-            ini_write_array: undefined,
-            ini_read_array: undefined
-        };
-        
-        // Terminal initialization
-        $(function() {
-            $('#terminal').terminal(function(command) {
-                if (command.trim() === '') {
-                    return;
-                }
-                
-                // Parse the command
+                convertEol: true
+            });
+            
+            // Abrir o terminal no elemento HTML
+            terminal.open(document.getElementById('terminal'));
+            
+            // Estado do terminal
+            let currentInput = '';
+            let currentPath = '/';
+            let history = [];
+            let historyIndex = 0;
+            let libraryLoaded = false;
+            
+            // Prompt padrão
+            const getPrompt = () => {
+                return `\r\n\x1b[32muser@bash-ini-parser\x1b[0m:\x1b[34m${currentPath}\x1b[0m$ `;
+            };
+            
+            // Mostrar o prompt
+            const showPrompt = () => {
+                terminal.write(getPrompt());
+            };
+            
+            // Mostrar a mensagem de boas-vindas
+            terminal.writeln('Bem-vindo ao terminal interativo do Bash INI Parser!');
+            terminal.writeln('');
+            terminal.writeln('Os arquivos da biblioteca estão disponíveis no diretório atual.');
+            terminal.writeln('Para começar, execute:');
+            terminal.writeln('');
+            terminal.writeln('  \x1b[32msource lib_ini.sh\x1b[0m');
+            terminal.writeln('  \x1b[32mini_read simple.ini app name\x1b[0m');
+            terminal.writeln('');
+            terminal.writeln('Para ver os comandos disponíveis, digite \x1b[32mhelp\x1b[0m');
+            terminal.writeln('');
+            
+            // Processar os comandos digitados pelo usuário
+            const processCommand = (command) => {
                 const parts = command.trim().split(/\s+/);
                 const cmd = parts[0];
                 const args = parts.slice(1);
                 
-                // Basic command handling
+                // Adicionar comando ao histórico
+                if (command.trim() !== '') {
+                    history.push(command);
+                    historyIndex = history.length;
+                }
+                
+                // Executar comando
                 switch (cmd) {
+                    case '':
+                        break;
+                    case 'help':
+                        terminal.writeln('Comandos disponíveis:');
+                        terminal.writeln('  ls [path]          - Listar arquivos no diretório especificado');
+                        terminal.writeln('  cd [path]          - Mudar para o diretório especificado');
+                        terminal.writeln('  pwd                - Mostrar o diretório atual');
+                        terminal.writeln('  cat <file>         - Mostrar o conteúdo de um arquivo');
+                        terminal.writeln('  source <file>      - Carregar um script Bash');
+                        terminal.writeln('  clear              - Limpar a tela do terminal');
+                        terminal.writeln('  help               - Mostrar esta mensagem de ajuda');
+                        terminal.writeln('');
+                        terminal.writeln('Após carregar lib_ini.sh, você pode usar estas funções:');
+                        terminal.writeln('  ini_read <file> <section> <key>       - Ler um valor');
+                        terminal.writeln('  ini_list_sections <file>              - Listar seções');
+                        terminal.writeln('  ini_list_keys <file> <section>        - Listar chaves em uma seção');
+                        break;
+                    case 'clear':
+                        terminal.clear();
+                        break;
+                    case 'pwd':
+                        terminal.writeln(currentPath);
+                        break;
+                    case 'ls':
+                        listFiles(args[0] || currentPath);
+                        break;
                     case 'cd':
                         changeDirectory(args[0] || '/');
                         break;
-                    case 'ls':
-                        listDirectory(args[0] || currentPath);
-                        break;
-                    case 'pwd':
-                        this.echo(currentPath);
-                        break;
                     case 'cat':
-                        catFile(args[0]);
+                        if (args.length === 0) {
+                            terminal.writeln('cat: falta operando');
+                            terminal.writeln('Uso: cat <arquivo>');
+                        } else {
+                            catFile(args[0]);
+                        }
                         break;
                     case 'source':
-                        sourceFile(args[0], this);
+                        if (args.length === 0) {
+                            terminal.writeln('source: falta nome do arquivo');
+                            terminal.writeln('Uso: source <arquivo>');
+                        } else {
+                            sourceFile(args[0]);
+                        }
                         break;
-                    case './run_demo.sh':
-                        runDemo();
+                    // Funções da biblioteca
+                    case 'ini_read':
+                        if (args.length < 3) {
+                            terminal.writeln('ini_read: faltam parâmetros');
+                            terminal.writeln('Uso: ini_read <arquivo> <seção> <chave>');
+                        } else {
+                            iniRead(args[0], args[1], args[2]);
+                        }
                         break;
-                    case 'clear':
-                        this.clear();
+                    case 'ini_list_sections':
+                        if (args.length < 1) {
+                            terminal.writeln('ini_list_sections: falta parâmetro');
+                            terminal.writeln('Uso: ini_list_sections <arquivo>');
+                        } else {
+                            iniListSections(args[0]);
+                        }
                         break;
-                    case 'help':
-                        showHelp();
+                    case 'ini_list_keys':
+                        if (args.length < 2) {
+                            terminal.writeln('ini_list_keys: faltam parâmetros');
+                            terminal.writeln('Uso: ini_list_keys <arquivo> <seção>');
+                        } else {
+                            iniListKeys(args[0], args[1]);
+                        }
                         break;
                     default:
-                        // Check if this is a sourced function
-                        if (sourceEnv[cmd]) {
-                            executeFunctionFromSourceEnv(cmd, args, this);
-                        } else {
-                            this.echo(`Command not found: ${cmd}\nType 'help' to see available commands.`);
-                        }
+                        terminal.writeln(`${cmd}: comando não encontrado`);
+                        break;
                 }
-            }, {
-                greetings: 'Bash INI Parser Interactive Demo\nType "help" to see available commands.\n\n[[;#82b366;]Note: lib_ini.sh has been pre-loaded for your convenience!]',
-                prompt: '[[;#76d275;]user@bash-ini-parser]:[[;#4dacf5;]' + currentPath + ']$ ',
-                name: 'bash-ini-parser-demo',
-                height: 400,
-                scrollOnEcho: true
-            });
-
-            // Automatically source lib_ini.sh at startup
-            sourceFile('lib_ini.sh', $('#terminal').terminal());
+                
+                showPrompt();
+            };
             
-            // Helper functions for the terminal
-            function resolvePath(path) {
-                // If it's an absolute path
-                if (path.startsWith('/')) {
-                    return path;
+            // Solução recomendada para manipulação de teclas em xterm.js
+            terminal.onKey((ev) => {
+                const key = ev.key;
+                const domEvent = ev.domEvent;
+                
+                // Tecla Enter - executa o comando
+                if (domEvent.keyCode === 13) {
+                    terminal.write('\r\n');
+                    processCommand(currentInput);
+                    currentInput = '';
+                    return;
                 }
                 
-                // Handle relative paths
-                let resolvedPath = currentPath;
-                const segments = path.split('/');
+                // Tecla Backspace - remove um caractere
+                if (domEvent.keyCode === 8) {
+                    if (currentInput.length > 0) {
+                        currentInput = currentInput.slice(0, -1);
+                        terminal.write('\b \b');
+                    }
+                    return;
+                }
                 
-                for (const segment of segments) {
-                    if (segment === '' || segment === '.') {
+                // Seta para cima - histórico anterior
+                if (domEvent.keyCode === 38) {
+                    if (history.length > 0 && historyIndex > 0) {
+                        historyIndex--;
+                        terminal.write('\r' + ' '.repeat(getPrompt().length + currentInput.length) + '\r');
+                        terminal.write(getPrompt());
+                        currentInput = history[historyIndex];
+                        terminal.write(currentInput);
+                    }
+                    return;
+                }
+                
+                // Seta para baixo - próximo histórico
+                if (domEvent.keyCode === 40) {
+                    if (history.length > 0) {
+                        if (historyIndex < history.length - 1) {
+                            historyIndex++;
+                        } else {
+                            currentInput = '';
+                        }
+                        terminal.write('\r' + ' '.repeat(getPrompt().length + currentInput.length) + '\r');
+                        terminal.write(getPrompt());
+                        currentInput = historyIndex < history.length ? history[historyIndex] : '';
+                        terminal.write(currentInput);
+                    }
+                    return;
+                }
+                
+                // Ctrl+C - cancela o comando atual
+                if (domEvent.keyCode === 67 && domEvent.ctrlKey) {
+                    terminal.write('^C\r\n');
+                    currentInput = '';
+                    showPrompt();
+                    return;
+                }
+                
+                // Caracteres normais (incluindo espaço)
+                if (!domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey) {
+                    if (key.length === 1) {
+                        currentInput += key;
+                        terminal.write(key);
+                    } else if (domEvent.keyCode === 32) { // Espaço
+                        currentInput += ' ';
+                        terminal.write(' ');
+                    }
+                }
+            });
+            
+            // Prevenir a rolagem padrão da página quando o espaço é pressionado
+            document.addEventListener('keydown', function(e) {
+                if (e.keyCode === 32 && e.target === document.body) {
+                    e.preventDefault();
+                }
+            });
+            
+            // Mostrar o prompt e focar no terminal
+            showPrompt();
+            terminal.focus();
+            
+            // Pré-carregar a biblioteca para facilitar o uso
+            setTimeout(() => {
+                terminal.writeln('\r\nCarregando automaticamente a biblioteca...');
+                sourceFile('lib_ini.sh');
+                showPrompt();
+            }, 1000);
+            
+            // Funções para manipular arquivos
+            function getFilePath(path) {
+                let fullPath = path;
+                if (!path.startsWith('/')) {
+                    fullPath = currentPath === '/' ? '/' + path : currentPath + '/' + path;
+                }
+                
+                // Normalizar caminho
+                const parts = fullPath.split('/').filter(p => p);
+                const result = [];
+                for (const part of parts) {
+                    if (part === '.') continue;
+                    if (part === '..') {
+                        if (result.length) result.pop();
                         continue;
                     }
-                    if (segment === '..') {
-                        // Go up one directory
-                        if (resolvedPath !== '/') {
-                            resolvedPath = resolvedPath.replace(/\/[^\/]+\/?$/, '/');
-                            if (resolvedPath === '') resolvedPath = '/';
-                        }
-                    } else {
-                        // Go into directory
-                        resolvedPath = resolvedPath + (resolvedPath.endsWith('/') ? '' : '/') + segment;
-                    }
+                    result.push(part);
                 }
                 
-                return resolvedPath;
+                return '/' + result.join('/');
             }
             
-            function getContents(path) {
-                if (path === '/') return filesystem['/'];
+            function fileExists(path) {
+                const fullPath = getFilePath(path);
+                // Remover a barra inicial para verificar no objeto
+                const filePath = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
+                return filePath in filesData || Object.keys(filesData).some(key => key.startsWith(filePath + '/'));
+            }
+            
+            function isDirectory(path) {
+                const fullPath = getFilePath(path);
+                // Remover a barra inicial para verificar no objeto
+                const dirPath = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
                 
-                const parts = path.split('/').filter(p => p);
-                let current = filesystem['/'];
-                
-                for (const part of parts) {
-                    if (!current[part]) return null;
-                    current = current[part];
+                // Verificar se o caminho é exatamente um arquivo existente
+                if (dirPath in filesData) {
+                    return false; // É um arquivo, não um diretório
                 }
                 
-                return current;
+                // Um diretório existe se qualquer chave começar com o caminho + /
+                return Object.keys(filesData).some(key => {
+                    // Se o diretório for a raiz
+                    if (dirPath === '') return true;
+                    
+                    // Verificar se a chave começa com o caminho de diretório + /
+                    return key === dirPath || key.startsWith(dirPath + '/');
+                });
+            }
+            
+            function getFileContent(path) {
+                const fullPath = getFilePath(path);
+                // Remover a barra inicial para verificar no objeto
+                const filePath = fullPath.startsWith('/') ? fullPath.substring(1) : fullPath;
+                
+                return filesData[filePath] || null;
+            }
+            
+            function listFiles(path) {
+                const fullPath = getFilePath(path);
+                
+                if (!isDirectory(fullPath)) {
+                    terminal.writeln(`ls: não é possível acessar '${path}': Não é um diretório`);
+                    return;
+                }
+                
+                // Listar arquivos no diretório
+                const dirPrefix = fullPath === '/' ? '' : fullPath.substring(1) + '/';
+                const files = new Set();
+                const dirs = new Set();
+                
+                Object.keys(filesData).forEach(key => {
+                    // Se o caminho for a raiz, mostrar apenas o primeiro nível
+                    if (fullPath === '/') {
+                        const firstLevel = key.split('/')[0];
+                        if (key.includes('/')) {
+                            dirs.add(firstLevel);
+                        } else {
+                            files.add(firstLevel);
+                        }
+                    } 
+                    // Se for um subdiretório
+                    else if (key.startsWith(dirPrefix)) {
+                        const remaining = key.substring(dirPrefix.length);
+                        const nextLevel = remaining.split('/')[0];
+                        
+                        if (nextLevel) {
+                            if (remaining.includes('/')) {
+                                dirs.add(nextLevel);
+                            } else {
+                                files.add(nextLevel);
+                            }
+                        }
+                    }
+                });
+                
+                // Ordenar e mostrar
+                const output = [...dirs].sort().map(d => `\x1b[34m${d}/\x1b[0m`).concat(
+                    [...files].sort().map(f => f)
+                );
+                
+                if (output.length === 0) {
+                    terminal.writeln('');
+                } else {
+                    terminal.writeln(output.join('  '));
+                }
             }
             
             function changeDirectory(path) {
-                const terminal = $('#terminal').terminal();
-                const resolvedPath = resolvePath(path);
-                const contents = getContents(resolvedPath);
+                const fullPath = getFilePath(path);
                 
-                if (!contents || typeof contents !== 'object') {
-                    terminal.error(`cd: ${path}: Not a directory`);
+                if (!isDirectory(fullPath)) {
+                    terminal.writeln(`cd: ${path}: Não é um diretório`);
                     return;
                 }
                 
-                currentPath = resolvedPath;
-                // Update prompt
-                terminal.set_prompt('[[;#76d275;]user@bash-ini-parser]:[[;#4dacf5;]' + currentPath + ']$ ');
-            }
-            
-            function listDirectory(path) {
-                const terminal = $('#terminal').terminal();
-                const resolvedPath = resolvePath(path);
-                const contents = getContents(resolvedPath);
-                
-                if (!contents || typeof contents !== 'object') {
-                    terminal.error(`ls: ${path}: No such directory`);
-                    return;
-                }
-                
-                // Display directories and files
-                const items = Object.keys(contents).sort();
-                let output = '';
-                
-                for (const item of items) {
-                    if (typeof contents[item] === 'object') {
-                        output += `[[;#4dacf5;]${item}/] `;
-                    } else {
-                        output += `${item} `;
-                    }
-                }
-                
-                terminal.echo(output);
+                currentPath = fullPath === '' ? '/' : fullPath;
             }
             
             function catFile(path) {
-                const terminal = $('#terminal').terminal();
-                if (!path) {
-                    terminal.error('Usage: cat <filename>');
+                const fullPath = getFilePath(path);
+                
+                if (isDirectory(fullPath)) {
+                    terminal.writeln(`cat: ${path}: É um diretório`);
                     return;
                 }
                 
-                const resolvedPath = resolvePath(path);
-                let filePath = resolvedPath;
-                let contents;
-                
-                // Special case for files in current directory
-                if (!resolvedPath.includes('/')) {
-                    const currentContents = getContents(currentPath);
-                    contents = currentContents[path];
-                    filePath = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${path}`;
-                } else {
-                    // Handle full paths
-                    const parts = resolvedPath.split('/').filter(p => p);
-                    const fileName = parts.pop();
-                    const dirPath = '/' + parts.join('/');
-                    const dirContents = getContents(dirPath);
-                    
-                    if (dirContents && dirContents[fileName]) {
-                        contents = dirContents[fileName];
-                    }
-                }
-                
-                if (typeof contents === 'string') {
-                    terminal.echo(contents);
-                } else if (typeof contents === 'object') {
-                    terminal.error(`cat: ${path}: Is a directory`);
-                } else {
-                    terminal.error(`cat: ${path}: No such file`);
-                }
-            }
-
-            function sourceFile(path, terminal) {
-                if (!path) {
-                    terminal.error('Usage: source <filename>');
+                const content = getFileContent(fullPath);
+                if (content === null) {
+                    terminal.writeln(`cat: ${path}: Arquivo não encontrado`);
                     return;
                 }
                 
-                const resolvedPath = resolvePath(path);
-                let filePath = resolvedPath;
-                let contents;
+                terminal.writeln(content);
+            }
+            
+            function sourceFile(path) {
+                const fullPath = getFilePath(path);
                 
-                // Special case for files in current directory
-                if (!resolvedPath.includes('/')) {
-                    const currentContents = getContents(currentPath);
-                    contents = currentContents[path];
-                    filePath = `${currentPath}${currentPath.endsWith('/') ? '' : '/'}${path}`;
+                if (isDirectory(fullPath)) {
+                    terminal.writeln(`source: ${path}: É um diretório`);
+                    return;
+                }
+                
+                const content = getFileContent(fullPath);
+                if (content === null) {
+                    terminal.writeln(`source: ${path}: Arquivo não encontrado`);
+                    return;
+                }
+                
+                terminal.writeln(`Biblioteca ${path} carregada com sucesso.`);
+                
+                // Se for lib_ini.sh, marcar como carregada
+                if (path.endsWith('lib_ini.sh')) {
+                    libraryLoaded = true;
+                    terminal.writeln('Agora você pode usar os comandos: ini_read, ini_list_sections, ini_list_keys, etc.');
+                }
+            }
+            
+            function iniRead(file, section, key) {
+                if (!libraryLoaded) {
+                    terminal.writeln('\x1b[31mErro: Biblioteca lib_ini.sh não foi carregada.\x1b[0m');
+                    terminal.writeln('Use o comando "source lib_ini.sh" primeiro.');
+                    return;
+                }
+                
+                const fullPath = getFilePath(file);
+                const content = getFileContent(fullPath);
+                
+                if (content === null) {
+                    terminal.writeln(`ini_read: ${file}: Arquivo não encontrado`);
+                    return;
+                }
+                
+                terminal.writeln(`Lendo [${section}].${key} de ${file}...`);
+                
+                // Parseamento básico de arquivo INI
+                let inSection = false;
+                const lines = content.split('\n');
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    // Pular comentários e linhas vazias
+                    if (trimmedLine === '' || trimmedLine.startsWith('#') || trimmedLine.startsWith(';')) {
+                        continue;
+                    }
+                    
+                    // Verificar se é uma seção
+                    const sectionMatch = trimmedLine.match(/^\[(.*)\]$/);
+                    if (sectionMatch) {
+                        inSection = sectionMatch[1] === section;
+                        continue;
+                    }
+                    
+                    // Se estiver na seção correta, procurar a chave
+                    if (inSection) {
+                        const parts = trimmedLine.split('=');
+                        if (parts.length >= 2) {
+                            const currentKey = parts[0].trim();
+                            if (currentKey === key) {
+                                // Juntar o restante para o caso de valores com = no meio
+                                const value = parts.slice(1).join('=').trim();
+                                terminal.writeln(value);
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                terminal.writeln('Valor não encontrado');
+            }
+            
+            function iniListSections(file) {
+                if (!libraryLoaded) return;
+                
+                const fullPath = getFilePath(file);
+                const content = getFileContent(fullPath);
+                
+                if (content === null) {
+                    terminal.writeln(`ini_list_sections: ${file}: Arquivo não encontrado`);
+                    return;
+                }
+                
+                terminal.writeln(`Listando seções em ${file}...`);
+                
+                // Encontrar todas as seções no arquivo
+                const lines = content.split('\n');
+                const sections = [];
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    // Pular comentários e linhas vazias
+                    if (trimmedLine === '' || trimmedLine.startsWith('#') || trimmedLine.startsWith(';')) {
+                        continue;
+                    }
+                    
+                    // Verificar se é uma seção
+                    const sectionMatch = trimmedLine.match(/^\[(.*)\]$/);
+                    if (sectionMatch) {
+                        sections.push(sectionMatch[1]);
+                    }
+                }
+                
+                if (sections.length === 0) {
+                    terminal.writeln('Nenhuma seção encontrada');
                 } else {
-                    // Handle full paths
-                    const parts = resolvedPath.split('/').filter(p => p);
-                    const fileName = parts.pop();
-                    const dirPath = '/' + parts.join('/');
-                    const dirContents = getContents(dirPath);
+                    for (const section of sections) {
+                        terminal.writeln(section);
+                    }
+                }
+            }
+            
+            function iniListKeys(file, section) {
+                if (!libraryLoaded) return;
+                
+                const fullPath = getFilePath(file);
+                const content = getFileContent(fullPath);
+                
+                if (content === null) {
+                    terminal.writeln(`ini_list_keys: ${file}: Arquivo não encontrado`);
+                    return;
+                }
+                
+                terminal.writeln(`Listando chaves na seção [${section}] de ${file}...`);
+                
+                // Encontrar todas as chaves na seção especificada
+                let inSection = false;
+                const lines = content.split('\n');
+                const keys = [];
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
                     
-                    if (dirContents && dirContents[fileName]) {
-                        contents = dirContents[fileName];
+                    // Pular comentários e linhas vazias
+                    if (trimmedLine === '' || trimmedLine.startsWith('#') || trimmedLine.startsWith(';')) {
+                        continue;
+                    }
+                    
+                    // Verificar se é uma seção
+                    const sectionMatch = trimmedLine.match(/^\[(.*)\]$/);
+                    if (sectionMatch) {
+                        inSection = sectionMatch[1] === section;
+                        continue;
+                    }
+                    
+                    // Se estivermos na seção correta, extrair a chave
+                    if (inSection) {
+                        const parts = trimmedLine.split('=');
+                        if (parts.length >= 2) {
+                            const key = parts[0].trim();
+                            keys.push(key);
+                        }
                     }
                 }
                 
-                if (typeof contents === 'string') {
-                    // Extract function definitions and add to sourceEnv
-                    const functionMatches = contents.match(/function\s+(\w+)\(\)/g);
-                    if (functionMatches) {
-                        functionMatches.forEach(match => {
-                            const funcName = match.match(/function\s+(\w+)/)[1];
-                            sourceEnv[funcName] = true;
-                        });
-                        terminal.echo(`Sourced ${path} - functions loaded: ${Object.keys(sourceEnv).filter(k => sourceEnv[k]).join(', ')}`);
-                    } else {
-                        terminal.echo(`Sourced ${path} - no functions found`);
-                    }
+                if (keys.length === 0) {
+                    terminal.writeln('Nenhuma chave encontrada');
                 } else {
-                    terminal.error(`source: ${path}: No such file`);
-                }
-            }
-
-            function executeFunctionFromSourceEnv(funcName, args, terminal) {
-                // This simulates calling a sourced function
-                switch (funcName) {
-                    case 'ini_read':
-                        if (args.length < 3) {
-                            terminal.error('Usage: ini_read <file> <section> <key>');
-                            return;
-                        }
-                        terminal.echo(`Reading [${args[1]}].${args[2]} from ${args[0]}...`);
-                        
-                        if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'name') {
-                            terminal.echo('Meu Aplicativo');
-                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'version') {
-                            terminal.echo('1.0.0');
-                        } else if (args[0] === 'simple.ini' && args[1] === 'app' && args[2] === 'debug') {
-                            terminal.echo('false');
-                        } else if (args[0] === 'simple.ini' && args[1] === 'database' && args[2] === 'host') {
-                            terminal.echo('localhost');
-                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'descrição') {
-                            terminal.echo('Este é um sistema complexo com várias funcionalidades');
-                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema' && args[2] === 'versão') {
-                            terminal.echo('2.0.0');
-                        } else if (args[0] === 'complex.ini' && args[1] === 'configurações' && args[2] === 'diretório de dados') {
-                            terminal.echo('C:\\Programa Files\\Sistema\\data');
-                        } else {
-                            terminal.error('Value not found');
-                        }
-                        break;
-                    
-                    case 'ini_list_sections':
-                        if (args.length < 1) {
-                            terminal.error('Usage: ini_list_sections <file>');
-                            return;
-                        }
-                        terminal.echo(`Listing sections in ${args[0]}...`);
-                        
-                        if (args[0] === 'simple.ini') {
-                            terminal.echo('app');
-                            terminal.echo('database');
-                        } else if (args[0] === 'complex.ini') {
-                            terminal.echo('sistema');
-                            terminal.echo('configurações');
-                        } else if (args[0] === 'empty.ini') {
-                            terminal.echo('No sections found');
-                        }
-                        break;
-                    
-                    case 'ini_list_keys':
-                        if (args.length < 2) {
-                            terminal.error('Usage: ini_list_keys <file> <section>');
-                            return;
-                        }
-                        terminal.echo(`Listing keys in [${args[1]}] from ${args[0]}...`);
-                        
-                        if (args[0] === 'simple.ini' && args[1] === 'app') {
-                            terminal.echo('name');
-                            terminal.echo('version');
-                            terminal.echo('debug');
-                        } else if (args[0] === 'simple.ini' && args[1] === 'database') {
-                            terminal.echo('host');
-                            terminal.echo('port');
-                            terminal.echo('user');
-                            terminal.echo('password');
-                        } else if (args[0] === 'complex.ini' && args[1] === 'sistema') {
-                            terminal.echo('descrição');
-                            terminal.echo('versão');
-                        } else {
-                            terminal.error('Section not found');
-                        }
-                        break;
-                    
-                    default:
-                        terminal.echo(`Function ${funcName} is available but not fully implemented in this demo.`);
-                }
-            }
-            
-            function runDemo() {
-                const terminal = $('#terminal').terminal();
-                const demo = filesystem['/']['run_demo.sh'];
-                
-                // Execute the demo script line by line
-                terminal.echo('[[;#82b366;]Running demo script...]');
-                terminal.echo('');
-                
-                const lines = demo.split('\n');
-                let i = 0;
-                
-                function processNextLine() {
-                    if (i < lines.length) {
-                        const line = lines[i++].trim();
-                        
-                        // Skip comments and empty lines
-                        if (line.startsWith('#') || line === '') {
-                            processNextLine();
-                            return;
-                        }
-                        
-                        terminal.echo(`\$ ${line}`);
-                        
-                        // Simulate command execution
-                        if (line.startsWith('echo')) {
-                            // Just echo the text
-                            const text = line.substring(5).replace(/^"|"$/g, '');
-                            terminal.echo(text);
-                            setTimeout(processNextLine, 500);
-                        } else if (line.includes('ini_')) {
-                            // Handle INI functions
-                            setTimeout(() => {
-                                simulateIniFunction(line);
-                                processNextLine();
-                            }, 800);
-                        } else if (line.includes('source')) {
-                            // Handle source command
-                            setTimeout(() => {
-                                terminal.echo('Sourced lib_ini.sh - functions loaded successfully');
-                                processNextLine();
-                            }, 500);
-                        } else {
-                            // Other commands
-                            setTimeout(processNextLine, 300);
-                        }
+                    for (const key of keys) {
+                        terminal.writeln(key);
                     }
                 }
-                
-                processNextLine();
-            }
-            
-            function simulateIniFunction(line) {
-                const terminal = $('#terminal').terminal();
-                
-                if (line.includes('ini_add_section')) {
-                    terminal.echo('Section added successfully.');
-                } else if (line.includes('ini_write')) {
-                    terminal.echo('Value written successfully.');
-                } else if (line.includes('ini_read') && !line.includes('ini_read_array')) {
-                    if (line.includes('app_name')) {
-                        terminal.echo('My Application');
-                    } else if (line.includes('app_version')) {
-                        terminal.echo('1.0.0');
-                    }
-                } else if (line.includes('ini_list_sections')) {
-                    terminal.echo('app');
-                } else if (line.includes('ini_list_keys')) {
-                    terminal.echo('name');
-                    terminal.echo('version');
-                    if (line.includes('while read')) {
-                        terminal.echo('supported_formats');
-                    }
-                } else if (line.includes('ini_write_array')) {
-                    terminal.echo('Array written successfully.');
-                } else if (line.includes('ini_read_array')) {
-                    terminal.echo('jpg');
-                    terminal.echo('png');
-                    terminal.echo('gif');
-                }
-            }
-            
-            function showHelp() {
-                const terminal = $('#terminal').terminal();
-                terminal.echo('Available commands:');
-                terminal.echo('  ls [path]          - List files in the specified directory');
-                terminal.echo('  cd [path]          - Change to the specified directory');
-                terminal.echo('  pwd                - Print current directory');
-                terminal.echo('  cat <file>         - Display file contents');
-                terminal.echo('  source <file>      - Source a script to load its functions');
-                terminal.echo('  ./run_demo.sh      - Run the demonstration script');
-                terminal.echo('  clear              - Clear the terminal screen');
-                terminal.echo('  help               - Show this help message');
-                terminal.echo('');
-                terminal.echo('Available INI functions (already loaded):');
-                terminal.echo('  ini_read <file> <section> <key>          - Read a value');
-                terminal.echo('  ini_list_sections <file>                 - List sections');
-                terminal.echo('  ini_list_keys <file> <section>           - List keys in a section');
             }
         });
     </script>
