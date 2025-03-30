@@ -42,7 +42,7 @@
             max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
-            overflow-anchor: none; /* Prevenir rolagem automática */
+            overflow-anchor: none; /* Prevent automatic scrolling */
         }
         
         header {
@@ -146,8 +146,8 @@
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             position: relative; /* Changed from static to relative */
-            height: 450px; /* Altura fixa para evitar que o terminal mude de tamanho */
-            overflow-anchor: none; /* Desabilitar ancora de rolagem */
+            height: 450px; /* Fixed height to prevent terminal size changes */
+            overflow-anchor: none; /* Disable scroll anchoring */
         }
         
         /* Botões e barra de ferramentas do terminal */
@@ -164,7 +164,7 @@
         /* Estilo para o terminal real */
         #terminal {
             width: 100%;
-            height: 400px; /* Altura fixa */
+            height: 400px; /* Fixed height */
             overflow-anchor: none; 
             position: relative; /* Changed from static to relative */
             z-index: 5; /* Added z-index */
@@ -243,14 +243,14 @@
         <p>Experiment with the bash-ini-parser library directly in your browser! The terminal below has access to all example files.</p>
         
         <div class="message-box">
-            <h3>Como usar:</h3>
-            <p>Para testar a biblioteca, execute estes comandos:</p>
+            <h3>How to use:</h3>
+            <p>To test the library, run these commands:</p>
             <ol>
-                <li><code>ls</code> - Para listar os arquivos disponíveis</li>
-                <li><code>cat lib_ini.sh</code> - Para visualizar o código da biblioteca</li>
-                <li><code>source lib_ini.sh</code> - Para carregar a biblioteca na sessão atual</li>
-                <li><code>cat examples/simple.ini</code> - Para ver um arquivo INI de exemplo</li>
-                <li>Agora você pode usar comandos como <code>ini_read simple.ini app name</code></li>
+                <li><code>ls</code> - List available files</li>
+                <li><code>cat lib_ini.sh</code> - View the library code</li>
+                <li><code>source lib_ini.sh</code> - Load the library in the current session</li>
+                <li><code>cat examples/simple.ini</code> - View an example INI file</li>
+                <li>Now you can use commands like <code>ini_read simple.ini app name</code></li>
             </ol>
         </div>
         
@@ -408,7 +408,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
     </footer>
 
     <script>
-        // Sistema de arquivos e arquivos embutidos
+        // File system and embedded files
         const filesData = {
             'lib_ini.sh': "<!-- LIB_INI_SH_CONTENT -->",
             'simple.ini': "<!-- SIMPLE_INI_CONTENT -->",
@@ -458,15 +458,15 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
             };
             
             // Mostrar a mensagem de boas-vindas
-            terminal.writeln('Bem-vindo ao terminal interativo do Bash INI Parser!');
+            terminal.writeln('Welcome to the interactive Bash INI Parser terminal!');
             terminal.writeln('');
-            terminal.writeln('Os arquivos da biblioteca estão disponíveis no diretório atual.');
-            terminal.writeln('Para começar, execute:');
+            terminal.writeln('The library files are available in the current directory.');
+            terminal.writeln('To get started, run:');
             terminal.writeln('');
             terminal.writeln('  \x1b[32msource lib_ini.sh\x1b[0m');
             terminal.writeln('  \x1b[32mini_read simple.ini app name\x1b[0m');
             terminal.writeln('');
-            terminal.writeln('Para ver os comandos disponíveis, digite \x1b[32mhelp\x1b[0m');
+            terminal.writeln('To see available commands, type \x1b[32mhelp\x1b[0m');
             terminal.writeln('');
             
             // Processar os comandos digitados pelo usuário
@@ -486,19 +486,19 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                     case '':
                         break;
                     case 'help':
-                        terminal.writeln('Comandos disponíveis:');
-                        terminal.writeln('  ls [path]          - Listar arquivos no diretório especificado');
-                        terminal.writeln('  cd [path]          - Mudar para o diretório especificado');
-                        terminal.writeln('  pwd                - Mostrar o diretório atual');
-                        terminal.writeln('  cat <file>         - Mostrar o conteúdo de um arquivo');
-                        terminal.writeln('  source <file>      - Carregar um script Bash');
-                        terminal.writeln('  clear              - Limpar a tela do terminal');
-                        terminal.writeln('  help               - Mostrar esta mensagem de ajuda');
+                        terminal.writeln('Available commands:');
+                        terminal.writeln('  ls [path]          - List files in the specified directory');
+                        terminal.writeln('  cd [path]          - Change to the specified directory');
+                        terminal.writeln('  pwd                - Show current directory');
+                        terminal.writeln('  cat <file>         - Show file content');
+                        terminal.writeln('  source <file>      - Load a Bash script');
+                        terminal.writeln('  clear              - Clear the terminal screen');
+                        terminal.writeln('  help               - Show this help message');
                         terminal.writeln('');
-                        terminal.writeln('Após carregar lib_ini.sh, você pode usar estas funções:');
-                        terminal.writeln('  ini_read <file> <section> <key>       - Ler um valor');
-                        terminal.writeln('  ini_list_sections <file>              - Listar seções');
-                        terminal.writeln('  ini_list_keys <file> <section>        - Listar chaves em uma seção');
+                        terminal.writeln('After loading lib_ini.sh, you can use these functions:');
+                        terminal.writeln('  ini_read <file> <section> <key>       - Read a value');
+                        terminal.writeln('  ini_list_sections <file>              - List sections');
+                        terminal.writeln('  ini_list_keys <file> <section>        - List keys in a section');
                         break;
                     case 'clear':
                         terminal.clear();
@@ -514,16 +514,16 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                         break;
                     case 'cat':
                         if (args.length === 0) {
-                            terminal.writeln('cat: falta operando');
-                            terminal.writeln('Uso: cat <arquivo>');
+                            terminal.writeln('cat: missing operand');
+                            terminal.writeln('Usage: cat <file>');
                         } else {
                             catFile(args[0]);
                         }
                         break;
                     case 'source':
                         if (args.length === 0) {
-                            terminal.writeln('source: falta nome do arquivo');
-                            terminal.writeln('Uso: source <arquivo>');
+                            terminal.writeln('source: missing filename');
+                            terminal.writeln('Usage: source <file>');
                         } else {
                             sourceFile(args[0]);
                         }
@@ -531,30 +531,30 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                     // Funções da biblioteca
                     case 'ini_read':
                         if (args.length < 3) {
-                            terminal.writeln('ini_read: faltam parâmetros');
-                            terminal.writeln('Uso: ini_read <arquivo> <seção> <chave>');
+                            terminal.writeln('ini_read: missing parameters');
+                            terminal.writeln('Usage: ini_read <file> <section> <key>');
                         } else {
                             iniRead(args[0], args[1], args[2]);
                         }
                         break;
                     case 'ini_list_sections':
                         if (args.length < 1) {
-                            terminal.writeln('ini_list_sections: falta parâmetro');
-                            terminal.writeln('Uso: ini_list_sections <arquivo>');
+                            terminal.writeln('ini_list_sections: missing parameter');
+                            terminal.writeln('Usage: ini_list_sections <file>');
                         } else {
                             iniListSections(args[0]);
                         }
                         break;
                     case 'ini_list_keys':
                         if (args.length < 2) {
-                            terminal.writeln('ini_list_keys: faltam parâmetros');
-                            terminal.writeln('Uso: ini_list_keys <arquivo> <seção>');
+                            terminal.writeln('ini_list_keys: missing parameters');
+                            terminal.writeln('Usage: ini_list_keys <file> <section>');
                         } else {
                             iniListKeys(args[0], args[1]);
                         }
                         break;
                     default:
-                        terminal.writeln(`${cmd}: comando não encontrado`);
+                        terminal.writeln(`${cmd}: command not found`);
                         break;
                 }
                 
@@ -644,7 +644,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
             
             // Pré-carregar a biblioteca para facilitar o uso
             setTimeout(() => {
-                terminal.writeln('\r\nCarregando automaticamente a biblioteca...');
+                terminal.writeln('\r\nAutomatically loading the library...');
                 sourceFile('lib_ini.sh');
                 showPrompt();
             }, 1000);
@@ -710,7 +710,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const fullPath = getFilePath(path);
                 
                 if (!isDirectory(fullPath)) {
-                    terminal.writeln(`ls: não é possível acessar '${path}': Não é um diretório`);
+                    terminal.writeln(`ls: cannot access '${path}': Not a directory`);
                     return;
                 }
                 
@@ -760,7 +760,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const fullPath = getFilePath(path);
                 
                 if (!isDirectory(fullPath)) {
-                    terminal.writeln(`cd: ${path}: Não é um diretório`);
+                    terminal.writeln(`cd: ${path}: Not a directory`);
                     return;
                 }
                 
@@ -771,13 +771,13 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const fullPath = getFilePath(path);
                 
                 if (isDirectory(fullPath)) {
-                    terminal.writeln(`cat: ${path}: É um diretório`);
+                    terminal.writeln(`cat: ${path}: Is a directory`);
                     return;
                 }
                 
                 const content = getFileContent(fullPath);
                 if (content === null) {
-                    terminal.writeln(`cat: ${path}: Arquivo não encontrado`);
+                    terminal.writeln(`cat: ${path}: File not found`);
                     return;
                 }
                 
@@ -788,29 +788,29 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const fullPath = getFilePath(path);
                 
                 if (isDirectory(fullPath)) {
-                    terminal.writeln(`source: ${path}: É um diretório`);
+                    terminal.writeln(`source: ${path}: Is a directory`);
                     return;
                 }
                 
                 const content = getFileContent(fullPath);
                 if (content === null) {
-                    terminal.writeln(`source: ${path}: Arquivo não encontrado`);
+                    terminal.writeln(`source: ${path}: File not found`);
                     return;
                 }
                 
-                terminal.writeln(`Biblioteca ${path} carregada com sucesso.`);
+                terminal.writeln(`Library ${path} loaded successfully.`);
                 
                 // Se for lib_ini.sh, marcar como carregada
                 if (path.endsWith('lib_ini.sh')) {
                     libraryLoaded = true;
-                    terminal.writeln('Agora você pode usar os comandos: ini_read, ini_list_sections, ini_list_keys, etc.');
+                    terminal.writeln('Now you can use commands: ini_read, ini_list_sections, ini_list_keys, etc.');
                 }
             }
             
             function iniRead(file, section, key) {
                 if (!libraryLoaded) {
-                    terminal.writeln('\x1b[31mErro: Biblioteca lib_ini.sh não foi carregada.\x1b[0m');
-                    terminal.writeln('Use o comando "source lib_ini.sh" primeiro.');
+                    terminal.writeln('\x1b[31mError: Library lib_ini.sh not loaded.\x1b[0m');
+                    terminal.writeln('Use the "source lib_ini.sh" command first.');
                     return;
                 }
                 
@@ -818,11 +818,11 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const content = getFileContent(fullPath);
                 
                 if (content === null) {
-                    terminal.writeln(`ini_read: ${file}: Arquivo não encontrado`);
+                    terminal.writeln(`ini_read: ${file}: File not found`);
                     return;
                 }
                 
-                terminal.writeln(`Lendo [${section}].${key} de ${file}...`);
+                terminal.writeln(`Reading [${section}].${key} from ${file}...`);
                 
                 // Parseamento básico de arquivo INI
                 let inSection = false;
@@ -858,7 +858,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                     }
                 }
                 
-                terminal.writeln('Valor não encontrado');
+                terminal.writeln('Value not found');
             }
             
             function iniListSections(file) {
@@ -868,11 +868,11 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const content = getFileContent(fullPath);
                 
                 if (content === null) {
-                    terminal.writeln(`ini_list_sections: ${file}: Arquivo não encontrado`);
+                    terminal.writeln(`ini_list_sections: ${file}: File not found`);
                     return;
                 }
                 
-                terminal.writeln(`Listando seções em ${file}...`);
+                terminal.writeln(`Listing sections in ${file}...`);
                 
                 // Encontrar todas as seções no arquivo
                 const lines = content.split('\n');
@@ -894,7 +894,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 }
                 
                 if (sections.length === 0) {
-                    terminal.writeln('Nenhuma seção encontrada');
+                    terminal.writeln('No sections found');
                 } else {
                     for (const section of sections) {
                         terminal.writeln(section);
@@ -909,11 +909,11 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 const content = getFileContent(fullPath);
                 
                 if (content === null) {
-                    terminal.writeln(`ini_list_keys: ${file}: Arquivo não encontrado`);
+                    terminal.writeln(`ini_list_keys: ${file}: File not found`);
                     return;
                 }
                 
-                terminal.writeln(`Listando chaves na seção [${section}] de ${file}...`);
+                terminal.writeln(`Listing keys in section [${section}] of ${file}...`);
                 
                 // Encontrar todas as chaves na seção especificada
                 let inSection = false;
@@ -946,7 +946,7 @@ INI_ALLOW_SPACES_IN_NAMES=1</code></pre>
                 }
                 
                 if (keys.length === 0) {
-                    terminal.writeln('Nenhuma chave encontrada');
+                    terminal.writeln('No keys found');
                 } else {
                     for (const key of keys) {
                         terminal.writeln(key);
