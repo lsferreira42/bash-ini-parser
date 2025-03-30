@@ -1,12 +1,29 @@
 #!/bin/bash
 
-# Build script to generate index_poc.html from template_poc.html
+# Build script to generate HTML file from template_poc.html
 # This script uses Node.js to read repository files and embed them into the template
 
 # Exit on error
 set -e
 
-echo "Building index_poc.html from template_poc.html..."
+# Default output file
+OUTPUT_FILE="index_poc.html"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+echo "Building $OUTPUT_FILE from template_poc.html..."
 
 # Check if template_poc.html exists
 if [ ! -f "template_poc.html" ]; then
@@ -87,17 +104,17 @@ fi
 
 # Create a new approach using Node.js to build the HTML file
 echo "Creating a more robust build script..."
-cat > build_web_temp.js << 'EOF'
+cat > build_web_temp.js << EOF
 const fs = require('fs');
 const path = require('path');
 
 // File paths configuration
 const files = {
   template: 'template_poc.html',
-  output: 'index_poc.html',
+  output: '${OUTPUT_FILE}',
   lib: 'lib_ini.sh',
   config: {
-    content: '[app]\nname=My Application\nversion=1.0.0\nsupported_formats=jpg,png,gif'
+    content: '[app]\\nname=My Application\\nversion=1.0.0\\nsupported_formats=jpg,png,gif'
   },
   examples: {
     dir: 'examples',
@@ -117,7 +134,7 @@ function readFileOrDefault(filePath, defaultContent = '') {
     }
     return defaultContent;
   } catch (err) {
-    console.log(`Warning: Could not read ${filePath}: ${err.message}`);
+    console.log(\`Warning: Could not read \${filePath}: \${err.message}\`);
     return defaultContent;
   }
 }
@@ -140,16 +157,16 @@ console.log('Processing example files...');
 const examplesDir = files.examples.dir;
 for (const file of files.examples.files) {
   const filePath = path.join(examplesDir, file);
-  console.log(`Reading ${filePath}...`);
+  console.log(\`Reading \${filePath}...\`);
   const content = readFileOrDefault(filePath);
   
   // Replace placeholder in examples directory
-  const examplesPlaceholder = `<!-- EXAMPLES_${file.toUpperCase().replace(/\./g, '_')}_CONTENT -->`;
+  const examplesPlaceholder = \`<!-- EXAMPLES_\${file.toUpperCase().replace(/\\./g, '_')}_CONTENT -->\`;
   templateContent = safeReplaceInHTML(templateContent, examplesPlaceholder, content);
   
   // Also replace in root directory for INI files
   if (file.endsWith('.ini')) {
-    const rootPlaceholder = `<!-- ${file.toUpperCase().replace(/\./g, '_')}_CONTENT -->`;
+    const rootPlaceholder = \`<!-- \${file.toUpperCase().replace(/\\./g, '_')}_CONTENT -->\`;
     templateContent = safeReplaceInHTML(templateContent, rootPlaceholder, content);
   }
   
@@ -177,5 +194,5 @@ node build_web_temp.js
 # Clean up temporary file
 rm build_web_temp.js
 
-echo "Build complete! index_poc.html has been generated with proper escaping."
+echo "Build complete! $OUTPUT_FILE has been generated with proper escaping."
 echo "All repository files have been embedded and lib_ini.sh is pre-loaded." 
