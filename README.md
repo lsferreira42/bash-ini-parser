@@ -7,6 +7,12 @@ A robust shell script library for parsing and manipulating INI configuration fil
 - **Website:** [leandrosf.com](https://leandrosf.com)
 - **GitHub:** [lsferreira42](https://github.com/lsferreira42)
 
+## Try It Online
+
+You can try the Bash INI Parser directly in your browser through our interactive web demo. The demo provides a terminal environment with pre-loaded example files so you can test the library without installation.
+
+**[Try Bash INI Parser Online](https://lsferreira42.github.io/bash-ini-parser/)**
+
 ## Features
 
 - **Read and write** values from/to INI files
