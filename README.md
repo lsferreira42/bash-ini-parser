@@ -1,6 +1,10 @@
 # Bash INI Parser
 
-[![CI](https://github.com/lsferreira42/bash-ini-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/lsferreira42/bash-ini-parser/actions/workflows/ci.yml)
+![Build](https://github.com/lsferreira42/bash-ini-parser/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/github/license/lsferreira42/bash-ini-parser.svg)
+![Last Commit](https://img.shields.io/github/last-commit/lsferreira42/bash-ini-parser.svg)
+![Stars](https://img.shields.io/github/stars/lsferreira42/bash-ini-parser.svg)
+![Issues](https://img.shields.io/github/issues/lsferreira42/bash-ini-parser.svg)
 
 A robust shell script library for parsing and manipulating INI configuration files in Bash.
 
