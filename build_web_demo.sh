@@ -117,8 +117,7 @@ const files = {
     content: '[app]\\nname=My Application\\nversion=1.0.0\\nsupported_formats=jpg,png,gif'
   },
   examples: {
-    dir: 'examples',
-    files: ['simple.ini', 'complex.ini', 'empty.ini', 'basic_usage.sh', 'demo.sh']
+    dir: 'examples'
   }
 };
 
@@ -152,11 +151,21 @@ console.log('Processing lib_ini.sh...');
 const libContent = readFileOrDefault(files.lib);
 templateContent = safeReplaceInHTML(templateContent, '<!-- LIB_INI_SH_CONTENT -->', libContent);
 
-// Process example files
-console.log('Processing example files...');
+// Process all example files
+console.log('Processing all example files...');
 const examplesDir = files.examples.dir;
-for (const file of files.examples.files) {
+
+// Read all files from the examples directory
+const exampleFiles = fs.readdirSync(examplesDir);
+
+for (const file of exampleFiles) {
   const filePath = path.join(examplesDir, file);
+  
+  // Skip directories, only process files
+  if (fs.statSync(filePath).isDirectory()) {
+    continue;
+  }
+  
   console.log(\`Reading \${filePath}...\`);
   const content = readFileOrDefault(filePath);
   

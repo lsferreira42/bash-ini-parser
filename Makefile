@@ -1,6 +1,6 @@
 # Makefile for bash-ini-parser
 
-.PHONY: web clean
+.PHONY: web clean lint test
 
 # Build the web demo
 web:
@@ -15,8 +15,25 @@ clean:
 	@rm -f index.html
 	@echo "Clean complete."
 
+# Lint shell scripts with shellcheck
+lint:
+	@echo "Running shellcheck..."
+	@shellcheck lib_ini.sh
+	@shellcheck build_web_demo.sh
+	@shellcheck run_tests.sh
+	@echo "Lint complete."
+
+# Run all tests
+test:
+	@echo "Running tests..."
+	@chmod +x run_tests.sh
+	@./run_tests.sh
+	@echo "Tests complete."
+
 help:
 	@echo "Available targets:"
 	@echo "  web    - Build the interactive web demo (index.html)"
 	@echo "  clean  - Remove generated files"
+	@echo "  lint   - Check shell scripts with shellcheck"
+	@echo "  test   - Run all tests"
 	@echo "  help   - Show this help message" 

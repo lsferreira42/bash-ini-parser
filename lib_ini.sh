@@ -121,7 +121,8 @@ function ini_check_file() {
     if [ ! -f "$file" ]; then
         ini_debug "File does not exist, attempting to create: $file"
         # Create directory if it doesn't exist
-        local dir=$(dirname "$file")
+        local dir
+        dir=$(dirname "$file")
         if [ ! -d "$dir" ]; then
             mkdir -p "$dir" 2>/dev/null || {
                 ini_error "Could not create directory: $dir"
@@ -130,8 +131,7 @@ function ini_check_file() {
         fi
         
         # Create the file
-        touch "$file" 2>/dev/null
-        if [ $? -ne 0 ]; then
+        if ! touch "$file" 2>/dev/null; then
             ini_error "Could not create file: $file"
             return 1
         fi
@@ -175,8 +175,10 @@ function ini_read() {
     fi
     
     # Escape section and key for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
-    local escaped_key=$(ini_escape_for_regex "$key")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_key
+    escaped_key=$(ini_escape_for_regex "$key")
     
     local section_pattern="^\[$escaped_section\]"
     local in_section=0
@@ -204,7 +206,7 @@ function ini_read() {
         
         # Check for key in the current section
         if [[ $in_section -eq 1 ]]; then
-            local key_pattern="^[[:space:]]*$escaped_key[[:space:]]*="
+            local key_pattern="^[[:space:]]*${escaped_key}[[:space:]]*="
             if [[ "$line" =~ $key_pattern ]]; then
                 local value="${line#*=}"
                 # Trim whitespace
@@ -273,7 +275,8 @@ function ini_list_keys() {
     fi
     
     # Escape section for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
     local section_pattern="^\[$escaped_section\]"
     local in_section=0
     
@@ -331,7 +334,8 @@ function ini_section_exists() {
     fi
     
     # Escape section for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
     
     ini_debug "Checking if section '$section' exists in file: $file"
     
@@ -416,14 +420,17 @@ function ini_write() {
     ini_add_section "$file" "$section" || return 1
     
     # Escape section and key for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
-    local escaped_key=$(ini_escape_for_regex "$key")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_key
+    escaped_key=$(ini_escape_for_regex "$key")
     
     local section_pattern="^\[$escaped_section\]"
-    local key_pattern="^[[:space:]]*$escaped_key[[:space:]]*="
+    local key_pattern="^[[:space:]]*${escaped_key}[[:space:]]*="
     local in_section=0
     local found_key=0
-    local temp_file=$(ini_create_temp_file)
+    local temp_file
+    temp_file=$(ini_create_temp_file)
     
     ini_debug "Writing key '$key' with value '$value' to section '$section' in file: $file"
     
@@ -497,10 +504,12 @@ function ini_remove_section() {
     fi
     
     # Escape section for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
     local section_pattern="^\[$escaped_section\]"
     local in_section=0
-    local temp_file=$(ini_create_temp_file)
+    local temp_file
+    temp_file=$(ini_create_temp_file)
     
     ini_debug "Removing section '$section' from file: $file"
     
@@ -554,13 +563,16 @@ function ini_remove_key() {
     fi
     
     # Escape section and key for regex pattern
-    local escaped_section=$(ini_escape_for_regex "$section")
-    local escaped_key=$(ini_escape_for_regex "$key")
+    local escaped_section
+    escaped_section=$(ini_escape_for_regex "$section")
+    local escaped_key
+    escaped_key=$(ini_escape_for_regex "$key")
     
     local section_pattern="^\[$escaped_section\]"
-    local key_pattern="^[[:space:]]*$escaped_key[[:space:]]*="
+    local key_pattern="^[[:space:]]*${escaped_key}[[:space:]]*="
     local in_section=0
-    local temp_file=$(ini_create_temp_file)
+    local temp_file
+    temp_file=$(ini_create_temp_file)
     
     ini_debug "Removing key '$key' from section '$section' in file: $file"
     
@@ -613,9 +625,10 @@ function ini_get_or_default() {
     # Try to read the value
     local value
     value=$(ini_read "$file" "$section" "$key" 2>/dev/null)
+    local result=$?
     
     # Return the value or default
-    if [ $? -eq 0 ]; then
+    if [ $result -eq 0 ]; then
         echo "$value"
     else
         echo "$default_value"
@@ -653,7 +666,7 @@ function ini_import() {
     # Loop through sections
     for section in $sections; do
         # Skip if specific sections are provided and this one is not in the list
-        if [ ${#import_sections[@]} -gt 0 ] && ! [[ " ${import_sections[@]} " =~ " $section " ]]; then
+        if [ ${#import_sections[@]} -gt 0 ] && ! [[ ${import_sections[*]} =~ $section ]]; then
             ini_debug "Skipping section: $section"
             continue
         fi
@@ -815,8 +828,9 @@ function ini_read_array() {
         
         # Handle quotes
         if [ "$char" = '"' ]; then
+# shellcheck disable=SC1003
             # Check if the quote is escaped
-            if [ $i -gt 0 ] && [ "${value:$((i-1)):1}" = '\' ]; then
+            if [ $i -gt 0 ] && [ "${value:$((i-1)):1}" = "\\" ]; then
                 # It's an escaped quote, keep it
                 current_item="${current_item:0:-1}$char"
             else
@@ -891,7 +905,7 @@ function ini_write_array() {
 if [ -n "${INI_MODULES_DIR:-}" ] && [ -d "${INI_MODULES_DIR}" ]; then
     for module in "${INI_MODULES_DIR}"/*.sh; do
         if [ -f "$module" ] && [ -r "$module" ]; then
-            ini_debug "Loading module: $module"
+            # shellcheck disable=SC1090,SC1091
             source "$module"
         fi
     done

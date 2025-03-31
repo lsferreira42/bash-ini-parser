@@ -1,11 +1,8 @@
 # Bash INI Parser
 
-A robust shell script library for parsing and manipulating INI configuration files in Bash.
+[![CI](https://github.com/lsferreira42/bash-ini-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/lsferreira42/bash-ini-parser/actions/workflows/ci.yml)
 
-- **Version:** 0.0.1
-- **Author:** Leandro Ferreira
-- **Website:** [leandrosf.com](https://leandrosf.com)
-- **GitHub:** [lsferreira42](https://github.com/lsferreira42)
+A robust shell script library for parsing and manipulating INI configuration files in Bash.
 
 ## Try It Online
 
@@ -231,7 +228,6 @@ This project is licensed under the BSD License, a permissive free software licen
 
 - **Leandro Ferreira**
 - Website: [leandrosf.com](https://leandrosf.com)
-- GitHub: [lsferreira42](https://github.com/lsferreira42)
 
 ## Contributing
 
