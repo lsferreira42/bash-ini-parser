@@ -14,11 +14,23 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install shellcheck
-      run: sudo apt-get update && sudo apt-get install -y shellcheck
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck kcov
 
     - name: Check for syntax errors (lint)
       run: make lint
 
-    - name: Run tests
-      run: make test 
+    - name: Run tests with coverage
+      run: |
+        mkdir -p coverage
+        kcov --include-path=./lib_ini.sh coverage ./run_tests.sh
+        echo "Coverage report generated"
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./coverage
+        fail_ci_if_error: false
+        verbose: true 
