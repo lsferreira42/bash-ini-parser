@@ -8,23 +8,24 @@
 
 A robust shell script library for parsing and manipulating INI configuration files in Bash.
 
-## Try It Online
-
-You can try the Bash INI Parser directly in your browser through our interactive web demo. The demo provides a terminal environment with pre-loaded example files so you can test the library without installation.
-
-**[Try Bash INI Parser Online](https://lsferreira42.github.io/bash-ini-parser/)**
-
 ## Features
 
 - **Read and write** values from/to INI files
 - **List sections and keys** in INI files
 - **Add, update, and remove** sections and keys
+- **Rename sections and keys** with validation
+- **Validate INI file structure** for correctness
+- **Format and organize** INI files with indentation and sorting
+- **Batch operations** for efficient bulk updates
+- **Merge files** with configurable conflict resolution strategies
+- **Export to JSON and YAML** formats
 - **Supports complex values** including quotes, spaces, and special characters
 - **Array support** for storing multiple values
 - **Import/export functionality** between files and environment variables
 - **Extensive error handling** with detailed error messages
 - **Debug mode** for troubleshooting
 - **Configurable behavior** through environment variables
+- **Security features** including path validation, file locking, and atomic operations
 - **Backwards compatible** with previous versions
 
 ## Installation
@@ -120,6 +121,91 @@ if ini_key_exists "config.ini" "app" "version"; then
 fi
 ```
 
+### File Validation
+
+```bash
+# Validate the structure of an INI file
+if ini_validate "config.ini"; then
+    echo "File is valid"
+else
+    echo "File has errors"
+fi
+```
+
+### Get All Keys from a Section
+
+```bash
+# Get all key=value pairs from a section at once
+ini_get_all "config.ini" "app"
+# Output:
+# name=My Application
+# version=1.0.0
+# debug=true
+```
+
+### Rename Sections and Keys
+
+```bash
+# Rename a section
+ini_rename_section "config.ini" "old_section" "new_section"
+
+# Rename a key within a section
+ini_rename_key "config.ini" "app" "old_key" "new_key"
+```
+
+### Format INI Files
+
+```bash
+# Format file with indentation and sorted keys
+ini_format "config.ini" 2 1
+# Parameters: file, indent_spaces, sort_keys (0=no, 1=yes)
+
+# Basic formatting (no indentation, no sorting)
+ini_format "config.ini"
+```
+
+### Batch Write Operations
+
+```bash
+# Write multiple key-value pairs at once
+ini_batch_write "config.ini" "app" \
+    "name=MyApp" \
+    "version=1.0" \
+    "debug=true" \
+    "timeout=30"
+```
+
+### Merge INI Files
+
+```bash
+# Merge source.ini into target.ini with overwrite strategy
+ini_merge "source.ini" "target.ini" "overwrite"
+
+# Available strategies:
+# - "overwrite": Replace existing values with source values
+# - "skip": Keep existing values, only add new keys
+# - "merge": Append source values to existing values (comma-separated)
+
+# Merge only specific sections
+ini_merge "source.ini" "target.ini" "overwrite" "section1" "section2"
+```
+
+### Export to JSON and YAML
+
+```bash
+# Export to JSON (compact format)
+ini_to_json "config.ini" 0
+
+# Export to JSON (pretty format with indentation)
+ini_to_json "config.ini" 1
+
+# Export to YAML (default 2-space indent)
+ini_to_yaml "config.ini"
+
+# Export to YAML (custom indent)
+ini_to_yaml "config.ini" 4
+```
+
 ## Configuration Options
 
 The library's behavior can be customized by setting these variables either directly in your script after sourcing the library or as environment variables before sourcing the library:
@@ -155,9 +241,15 @@ INI_ALLOW_SPACES_IN_NAMES=1
 ### Security Improvements
 
 - **Input validation** for all parameters
+- **Path traversal protection** to prevent directory traversal attacks
 - **Secure regex handling** with proper escaping of special characters
-- **Temporary file security** to prevent data corruption
+- **Temporary file security** with automatic cleanup and tracking
 - **File permission checks** to ensure proper access rights
+- **File locking** to prevent race conditions during concurrent writes
+- **Atomic operations** with backup creation for data integrity
+- **Symlink resolution** to prevent malicious symlink attacks
+- **File size validation** to prevent resource exhaustion
+- **Environment variable name sanitization** for safe export
 - **Automatic directory creation** when needed
 
 ### Core Function Enhancements
@@ -175,9 +267,25 @@ INI_ALLOW_SPACES_IN_NAMES=1
 - `ini_debug` - Displays debug messages when debug mode is enabled
 - `ini_error` - Standardized error message format
 - `ini_validate_section_name` and `ini_validate_key_name` - Validate input data
+- `ini_validate_path` - Validates file paths and prevents traversal attacks
+- `ini_resolve_symlink` - Safely resolves symbolic links
+- `ini_check_file_size` - Validates file size limits
+- `ini_validate_env_var_name` - Validates environment variable names
+- `ini_lock_file` and `ini_unlock_file` - File locking for concurrent access
 - `ini_create_temp_file` - Creates temporary files securely
 - `ini_trim` - Removes whitespace from strings
 - `ini_escape_for_regex` - Properly escapes special characters
+
+#### Advanced Functions
+- `ini_validate` - Validates complete INI file structure
+- `ini_get_all` - Retrieves all key-value pairs from a section
+- `ini_rename_section` - Renames a section in the file
+- `ini_rename_key` - Renames a key within a section
+- `ini_format` - Formats and organizes INI files
+- `ini_batch_write` - Writes multiple key-value pairs efficiently
+- `ini_merge` - Merges INI files with configurable strategies
+- `ini_to_json` - Exports INI file to JSON format
+- `ini_to_yaml` - Exports INI file to YAML format
 
 ### Advanced Usage Examples
 
@@ -223,6 +331,22 @@ Check the `examples` directory for complete usage examples:
 - `basic_usage.sh`: Demonstrates core functionality
 - `advanced_usage.sh`: Shows advanced features
 
+## Testing
+
+Run the comprehensive test suite:
+
+```bash
+make test
+```
+
+The test suite includes:
+- **Basic tests** (47 tests): Core functionality validation
+- **Extended tests** (24 tests): Advanced features like arrays and imports
+- **Environment override tests** (11 tests): Configuration option validation
+- **Security tests** (25 tests): Security and durability improvements
+- **Advanced features tests** (39 tests): New advanced features validation
+
+**Total: 146 tests** covering all library functionality.
 
 ## License
 

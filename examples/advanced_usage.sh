@@ -2,10 +2,11 @@
 # Advanced usage example for the improved lib_ini.sh library
 
 # Source the library
+# shellcheck disable=SC1091
 source ../lib_ini.sh
 
 # Enable debug mode to see what's happening
-INI_DEBUG=1
+export INI_DEBUG=1
 echo "Debug mode enabled, you will see detailed information about operations"
 echo
 
@@ -74,8 +75,11 @@ echo
 echo "=== Environment Variables ==="
 ini_to_env "$CONFIG_FILE" "CFG"
 echo "Exported values to environment variables with prefix 'CFG'"
+# shellcheck disable=SC2154
 echo "Database host: $CFG_database_host"
+# shellcheck disable=SC2154
 echo "Database port: $CFG_database_port"
+# shellcheck disable=SC2154
 echo "App name: $CFG_app_name"
 echo
 

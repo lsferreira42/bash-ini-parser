@@ -2,6 +2,7 @@
 # Basic usage example for the Bash INI Parser library
 
 # Load the library
+# shellcheck disable=SC1091
 source ../lib_ini.sh
 
 echo "Simple INI file operations example"
@@ -43,12 +44,12 @@ echo
 # List sections and keys
 echo "3. Listing sections and keys"
 echo "Sections in the file:"
-ini_list_sections "$CONFIG_FILE" | while read section; do
+ini_list_sections "$CONFIG_FILE" | while read -r section; do
     echo "- $section"
 done
 
 echo "Keys in 'general' section:"
-ini_list_keys "$CONFIG_FILE" "general" | while read key; do
+ini_list_keys "$CONFIG_FILE" "general" | while read -r key; do
     echo "- $key"
 done
 echo
