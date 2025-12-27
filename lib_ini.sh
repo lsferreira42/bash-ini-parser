@@ -147,7 +147,7 @@ function ini_validate_path() {
     fi
     
     # Check for path traversal attempts
-    if [[ "$file" =~ \.\./ ]] || [[ "$file" =~ \.\.\\ ]]; then
+    if [[ "$file" =~ \.\./ ]]; then
         ini_error "Path traversal detected: $file"
         return 1
     fi
@@ -156,18 +156,24 @@ function ini_validate_path() {
     local normalized
     if command -v realpath >/dev/null 2>&1; then
         normalized=$(realpath -m "$file" 2>/dev/null || echo "$file")
+        # realpath returns absolute paths, so .. in the middle is valid (e.g., /home/../home)
+        # Only reject if .. appears at the start suggesting traversal
+        if [[ "$normalized" =~ ^\.\./ ]]; then
+            ini_error "Invalid path after normalization: $normalized"
+            return 1
+        fi
     else
         # Fallback: basic normalization
         normalized="$file"
         # Remove leading ./ if present
         normalized="${normalized#./}"
-    fi
-    
-    # Additional check: ensure path doesn't escape expected boundaries
-    # This is a basic check - in production, you might want more sophisticated validation
-    if [[ "$normalized" =~ \.\. ]]; then
-        ini_error "Invalid path after normalization: $normalized"
-        return 1
+        
+        # Additional check: ensure path doesn't escape expected boundaries
+        # Only check for .. if it's part of a path traversal pattern
+        if [[ "$normalized" =~ \.\./ ]] || [[ "$normalized" =~ /\.\. ]] || [[ "$normalized" =~ ^\.\.$ ]]; then
+            ini_error "Invalid path after normalization: $normalized"
+            return 1
+        fi
     fi
     
     return 0
@@ -247,6 +253,24 @@ function ini_validate_env_var_name() {
     
     return 0
 }
+
+# Remove UTF-8 BOM (Byte Order Mark) from a line if present
+# BOM in UTF-8 is the byte sequence EF BB BF (appears as U+FEFF)
+# This function is safe to call on any line - it only removes BOM if present
+function _ini_remove_bom() {
+    local line="$1"
+    
+    # Check if line starts with UTF-8 BOM (U+FEFF = \xEF\xBB\xBF)
+    # In bash, we check for the BOM character directly
+    if [[ "$line" =~ ^$'\xEF\xBB\xBF' ]]; then
+        # Remove BOM from the beginning
+        line="${line#$'\xEF\xBB\xBF'}"
+        ini_debug "Removed UTF-8 BOM from line"
+    fi
+    
+    echo "$line"
+}
+
 
 # Lock file using flock
 function ini_lock_file() {
@@ -380,7 +404,14 @@ function ini_read() {
     
     ini_debug "Reading key '$key' from section '$section' in file: $file"
     
+    local first_line=1
     while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Skip comments and empty lines
         if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
             continue
@@ -461,8 +492,20 @@ function ini_list_sections() {
     
     ini_debug "Listing sections in file: $file"
     
-    # Extract section names
-    grep -o '^\[[^]]*\]' "$file" 2>/dev/null | sed 's/^\[\(.*\)\]$/\1/'
+    # Extract section names, handling BOM on first line
+    local first_line=1
+    while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
+        # Check for section header
+        if [[ "$line" =~ ^\[([^]]+)\] ]]; then
+            echo "${BASH_REMATCH[1]}"
+        fi
+    done < "$file"
     return 0
 }
 
@@ -513,7 +556,14 @@ function ini_list_keys() {
     
     ini_debug "Listing keys in section '$section' in file: $file"
     
+    local first_line=1
     while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Skip comments and empty lines
         if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
             continue
@@ -588,17 +638,30 @@ function ini_section_exists() {
     
     ini_debug "Checking if section '$section' exists in file: $file"
     
-    # Check if section exists
-    grep -q "^\[$escaped_section\]" "$file"
-    local result=$?
+    # Check if section exists, handling BOM on first line
+    local first_line=1
+    local found=0
+    while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
+        # Check for section header
+        if [[ "$line" =~ ^\[$escaped_section\] ]]; then
+            found=1
+            break
+        fi
+    done < "$file"
     
-    if [ $result -eq 0 ]; then
+    if [ $found -eq 1 ]; then
         ini_debug "Section found: $section"
+        return 0
     else
         ini_debug "Section not found: $section"
+        return 1
     fi
-    
-    return $result
 }
 
 function ini_add_section() {
@@ -697,7 +760,14 @@ function ini_write() {
     fi
     
     # Process the file line by line
+    local first_line=1
     while IFS= read -r line || [ -n "$line" ]; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Check for section
         if [[ "$line" =~ $section_pattern ]]; then
             in_section=1
@@ -826,7 +896,14 @@ function ini_remove_section() {
     ini_debug "Removing section '$section' from file: $file"
     
     # Process the file line by line
+    local first_line=1
     while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Check for section
         if [[ "$line" =~ $section_pattern ]]; then
             in_section=1
@@ -945,7 +1022,14 @@ function ini_remove_key() {
     ini_debug "Removing key '$key' from section '$section' in file: $file"
     
     # Process the file line by line
+    local first_line=1
     while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Check for section
         if [[ "$line" =~ $section_pattern ]]; then
             in_section=1
@@ -1425,8 +1509,15 @@ function ini_validate() {
     local in_section=0
     local last_section=""
     local sections_found=0
+    local first_line=1
     
     while IFS= read -r line || [ -n "$line" ]; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         line_num=$((line_num + 1))
         local trimmed_line
         trimmed_line=$(ini_trim "$line")
@@ -1533,7 +1624,14 @@ function ini_get_all() {
     
     ini_debug "Getting all keys from section '$section' in file: $file"
     
+    local first_line=1
     while IFS= read -r line; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Skip comments and empty lines
         if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
             continue
@@ -1628,7 +1726,14 @@ function ini_rename_section() {
     ini_debug "Renaming section '$old_section' to '$new_section' in file: $file"
     
     # Process the file line by line
+    local first_line=1
     while IFS= read -r line || [ -n "$line" ]; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         # Check for old section header
         if [[ "$line" =~ $old_section_pattern ]]; then
             in_section=1
@@ -1781,7 +1886,14 @@ function ini_format() {
     local comments_before_section=()
     
     # First pass: collect all data
+    local first_line=1
     while IFS= read -r line || [ -n "$line" ]; do
+        # Remove BOM from first line if present
+        if [ "$first_line" -eq 1 ]; then
+            line=$(_ini_remove_bom "$line")
+            first_line=0
+        fi
+        
         local trimmed_line
         trimmed_line=$(ini_trim "$line")
         

@@ -40,6 +40,12 @@ bash tests/lib_ini_advanced_features_tests.sh
 
 ADVANCED_EXIT=$?
 
+# Now run the BOM support tests
+echo -e "\n${YELLOW}Running BOM Support Tests...${NC}"
+bash tests/lib_ini_bom_tests.sh
+
+BOM_EXIT=$?
+
 # Extract test counts from each test suite
 BASIC_TOTAL=$(bash tests/lib_ini_tests.sh 2>&1 | grep -oP 'Total tests executed: \K\d+' || echo "0")
 BASIC_PASSED=$(bash tests/lib_ini_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
@@ -61,10 +67,14 @@ ADVANCED_TOTAL=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP '
 ADVANCED_PASSED=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
 ADVANCED_FAILED=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
 
+BOM_TOTAL=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Total BOM tests executed: \K\d+' || echo "0")
+BOM_PASSED=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
+BOM_FAILED=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
+
 # Calculate totals
-TOTAL_TESTS=$((BASIC_TOTAL + EXTENDED_TOTAL + ENV_TOTAL + SECURITY_TOTAL + ADVANCED_TOTAL))
-TOTAL_PASSED=$((BASIC_PASSED + EXTENDED_PASSED + ENV_PASSED + SECURITY_PASSED + ADVANCED_PASSED))
-TOTAL_FAILED=$((BASIC_FAILED + EXTENDED_FAILED + ENV_FAILED + SECURITY_FAILED + ADVANCED_FAILED))
+TOTAL_TESTS=$((BASIC_TOTAL + EXTENDED_TOTAL + ENV_TOTAL + SECURITY_TOTAL + ADVANCED_TOTAL + BOM_TOTAL))
+TOTAL_PASSED=$((BASIC_PASSED + EXTENDED_PASSED + ENV_PASSED + SECURITY_PASSED + ADVANCED_PASSED + BOM_PASSED))
+TOTAL_FAILED=$((BASIC_FAILED + EXTENDED_FAILED + ENV_FAILED + SECURITY_FAILED + ADVANCED_FAILED + BOM_FAILED))
 
 echo -e "\n${YELLOW}=====================================${NC}"
 echo -e "${YELLOW}        Test Summary                ${NC}"
@@ -74,10 +84,11 @@ echo -e "Extended tests:     ${EXTENDED_TOTAL} executed, ${GREEN}${EXTENDED_PASS
 echo -e "Environment tests:  ${ENV_TOTAL} executed, ${GREEN}${ENV_PASSED} passed${NC}, ${RED}${ENV_FAILED} failed${NC}"
 echo -e "Security tests:     ${SECURITY_TOTAL} executed, ${GREEN}${SECURITY_PASSED} passed${NC}, ${RED}${SECURITY_FAILED} failed${NC}"
 echo -e "Advanced tests:     ${ADVANCED_TOTAL} executed, ${GREEN}${ADVANCED_PASSED} passed${NC}, ${RED}${ADVANCED_FAILED} failed${NC}"
+echo -e "BOM support tests:  ${BOM_TOTAL} executed, ${GREEN}${BOM_PASSED} passed${NC}, ${RED}${BOM_FAILED} failed${NC}"
 echo -e "${YELLOW}-------------------------------------${NC}"
 echo -e "Total:              ${TOTAL_TESTS} executed, ${GREEN}${TOTAL_PASSED} passed${NC}, ${RED}${TOTAL_FAILED} failed${NC}"
 
-if [ $BASIC_EXIT -eq 0 ] && [ $EXTENDED_EXIT -eq 0 ] && [ $ENV_OVERRIDE_EXIT -eq 0 ] && [ $SECURITY_EXIT -eq 0 ] && [ $ADVANCED_EXIT -eq 0 ]; then
+if [ $BASIC_EXIT -eq 0 ] && [ $EXTENDED_EXIT -eq 0 ] && [ $ENV_OVERRIDE_EXIT -eq 0 ] && [ $SECURITY_EXIT -eq 0 ] && [ $ADVANCED_EXIT -eq 0 ] && [ $BOM_EXIT -eq 0 ]; then
     echo -e "\n${GREEN}ALL TESTS PASSED!${NC}"
     exit 0
 else
@@ -87,5 +98,6 @@ else
     [ $ENV_OVERRIDE_EXIT -ne 0 ] && echo -e "${RED}Environment override tests failed.${NC}"
     [ $SECURITY_EXIT -ne 0 ] && echo -e "${RED}Security tests failed.${NC}"
     [ $ADVANCED_EXIT -ne 0 ] && echo -e "${RED}Advanced features tests failed.${NC}"
+    [ $BOM_EXIT -ne 0 ] && echo -e "${RED}BOM support tests failed.${NC}"
     exit 1
 fi 
