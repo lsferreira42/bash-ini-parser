@@ -114,13 +114,18 @@ function ini_validate_key_name() {
 
 # Create a secure temporary file
 function ini_create_temp_file() {
-    local temp_file
-    if ! temp_file=$(mktemp "${TMPDIR:-/tmp}/ini_XXXXXXXXXX" 2>/dev/null) || [ -z "$temp_file" ]; then
+    if (( $# < 1 )); then
+        ini_error "ini_create_temp_file: missing variable name argument"
+        return 1
+    fi
+    local -n _ini_ctf_ref=$1
+    local _ini_ctf_path
+    if ! _ini_ctf_path=$(mktemp "${TMPDIR:-/tmp}/ini_XXXXXXXXXX" 2>/dev/null) || [ -z "$_ini_ctf_path" ]; then
         ini_error "Failed to create temporary file"
         return 1
     fi
-    _ini_temp_files+=("$temp_file")
-    echo "$temp_file"
+    _ini_temp_files+=("$_ini_ctf_path")
+    _ini_ctf_ref="$_ini_ctf_path"
 }
 
 # Trim whitespace from start and end of a string
@@ -274,29 +279,34 @@ function _ini_remove_bom() {
 
 # Lock file using flock
 function ini_lock_file() {
-    local file="$1"
-    local lock_file="${file}.lock"
-    local lock_fd
-    local max_attempts=10
-    local attempt=0
+    if (( $# < 2 )); then
+        ini_error "ini_lock_file: missing arguments (file and variable name)"
+        return 1
+    fi
+    local _ini_lf_file="$1"
+    local -n _ini_lf_ref=$2
+    local _ini_lf_lock_file="${_ini_lf_file}.lock"
+    local _ini_lf_fd
+    local _ini_lf_max_attempts=10
+    local _ini_lf_attempt=0
     
     # Try to create lock file
-    while [ $attempt -lt $max_attempts ]; do
-        if exec {lock_fd}>"$lock_file" 2>/dev/null; then
+    while [ $_ini_lf_attempt -lt $_ini_lf_max_attempts ]; do
+        if exec {_ini_lf_fd}>"$_ini_lf_lock_file" 2>/dev/null; then
             # Try to obtain exclusive lock (timeout of 1 second per attempt)
-            if flock -w 1 -x "$lock_fd" 2>/dev/null; then
-                _ini_lock_fds+=("$lock_fd")
-                echo "$lock_fd"
+            if flock -w 1 -x "$_ini_lf_fd" 2>/dev/null; then
+                _ini_lock_fds+=("$_ini_lf_fd")
+                _ini_lf_ref="$_ini_lf_fd"
                 return 0
             else
-                exec {lock_fd}>&-
+                exec {_ini_lf_fd}>&-
             fi
         fi
-        attempt=$((attempt + 1))
+        _ini_lf_attempt=$((_ini_lf_attempt + 1))
         sleep 0.1
     done
     
-    ini_error "Failed to acquire lock on file: $file (after ${max_attempts} attempts)"
+    ini_error "Failed to acquire lock on file: $_ini_lf_file (after ${_ini_lf_max_attempts} attempts)"
     return 1
 }
 
@@ -743,10 +753,10 @@ function ini_write() {
     local found_key=0
     # Acquire lock for file writing
     local lock_fd
-    lock_fd=$(ini_lock_file "$file") || return 1
+    ini_lock_file "$file" lock_fd || return 1
     
     local temp_file
-    temp_file=$(ini_create_temp_file) || {
+    ini_create_temp_file temp_file || {
         ini_unlock_file "$lock_fd"
         return 1
     }
@@ -880,7 +890,7 @@ function ini_remove_section() {
     
     # Acquire lock for file writing
     local lock_fd
-    lock_fd=$(ini_lock_file "$file") || return 1
+    ini_lock_file "$file" lock_fd || return 1
     
     # Escape section for regex pattern
     local escaped_section
@@ -888,7 +898,7 @@ function ini_remove_section() {
     local section_pattern="^\[$escaped_section\]"
     local in_section=0
     local temp_file
-    temp_file=$(ini_create_temp_file) || {
+    ini_create_temp_file temp_file || {
         ini_unlock_file "$lock_fd"
         return 1
     }
@@ -1002,7 +1012,7 @@ function ini_remove_key() {
     
     # Acquire lock for file writing
     local lock_fd
-    lock_fd=$(ini_lock_file "$file") || return 1
+    ini_lock_file "$file" lock_fd || return 1
     
     # Escape section and key for regex pattern
     local escaped_section
@@ -1014,7 +1024,7 @@ function ini_remove_key() {
     local key_pattern="^[[:space:]]*${escaped_key}[[:space:]]*="
     local in_section=0
     local temp_file
-    temp_file=$(ini_create_temp_file) || {
+    ini_create_temp_file temp_file || {
         ini_unlock_file "$lock_fd"
         return 1
     }
@@ -1709,7 +1719,7 @@ function ini_rename_section() {
     
     # Acquire lock for file writing
     local lock_fd
-    lock_fd=$(ini_lock_file "$file") || return 1
+    ini_lock_file "$file" lock_fd || return 1
     
     # Escape sections for regex pattern
     local escaped_old_section
@@ -1718,7 +1728,7 @@ function ini_rename_section() {
     local old_section_pattern="^\[$escaped_old_section\]"
     local in_section=0
     local temp_file
-    temp_file=$(ini_create_temp_file) || {
+    ini_create_temp_file temp_file || {
         ini_unlock_file "$lock_fd"
         return 1
     }
@@ -1868,10 +1878,10 @@ function ini_format() {
     
     # Acquire lock for file writing
     local lock_fd
-    lock_fd=$(ini_lock_file "$file") || return 1
+    ini_lock_file "$file" lock_fd || return 1
     
     local temp_file
-    temp_file=$(ini_create_temp_file) || {
+    ini_create_temp_file temp_file || {
         ini_unlock_file "$lock_fd"
         return 1
     }

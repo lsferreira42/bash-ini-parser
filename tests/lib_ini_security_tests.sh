@@ -131,7 +131,7 @@ run_test "ini_create_temp_file exists" "type ini_create_temp_file > /dev/null 2>
 
 # Test that the function actually creates a temp file
 TESTS_TOTAL=$((TESTS_TOTAL + 1))
-TEMP_TEST_FILE=$(ini_create_temp_file 2>/dev/null)
+ini_create_temp_file TEMP_TEST_FILE 2>/dev/null
 if [ -n "$TEMP_TEST_FILE" ] && [ -f "$TEMP_TEST_FILE" ]; then
     echo -e "${GREEN}✓ ini_create_temp_file creates valid temp file${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))

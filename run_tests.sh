@@ -10,66 +10,43 @@ echo -e "${YELLOW}=====================================${NC}"
 echo -e "${YELLOW}  Running All bash_ini_parser Tests  ${NC}"
 echo -e "${YELLOW}=====================================${NC}\n"
 
-# First run the basic tests
-echo -e "${YELLOW}Running Basic Tests...${NC}"
-bash tests/lib_ini_tests.sh
+# Helper to run a test suite, capture output, and extract counts
+run_suite() {
+    local suite_name="$1"
+    local suite_cmd="$2"
+    local total_pattern="$3"
 
-BASIC_EXIT=$?
+    echo -e "${YELLOW}Running ${suite_name}...${NC}"
+    local output
+    output=$(bash "$suite_cmd" 2>&1)
+    local exit_code=$?
+    echo "$output"
 
-# Then run the extended tests
-echo -e "\n${YELLOW}Running Extended Tests...${NC}"
-bash tests/lib_ini_extended_tests.sh
+    # Extract counts from captured output
+    local total passed failed
+    total=$(echo "$output" | grep -oP "${total_pattern}: \\K\\d+" || echo "0")
+    passed=$(echo "$output" | grep -oP 'Tests passed: \K\d+' || echo "0")
+    failed=$(echo "$output" | grep -oP 'Tests failed: \K\d+' || echo "0")
 
-EXTENDED_EXIT=$?
+    # Store results in global variables using nameref
+    eval "${suite_name// /_}_TOTAL=$total"
+    eval "${suite_name// /_}_PASSED=$passed"
+    eval "${suite_name// /_}_FAILED=$failed"
+    eval "${suite_name// /_}_EXIT=$exit_code"
+}
 
-# Now run the environment override tests
-echo -e "\n${YELLOW}Running Environment Override Tests...${NC}"
-bash tests/test_env_override.sh
-
-ENV_OVERRIDE_EXIT=$?
-
-# Now run the security tests
-echo -e "\n${YELLOW}Running Security Tests...${NC}"
-bash tests/lib_ini_security_tests.sh
-
-SECURITY_EXIT=$?
-
-# Now run the advanced features tests
-echo -e "\n${YELLOW}Running Advanced Features Tests...${NC}"
-bash tests/lib_ini_advanced_features_tests.sh
-
-ADVANCED_EXIT=$?
-
-# Now run the BOM support tests
-echo -e "\n${YELLOW}Running BOM Support Tests...${NC}"
-bash tests/lib_ini_bom_tests.sh
-
-BOM_EXIT=$?
-
-# Extract test counts from each test suite
-BASIC_TOTAL=$(bash tests/lib_ini_tests.sh 2>&1 | grep -oP 'Total tests executed: \K\d+' || echo "0")
-BASIC_PASSED=$(bash tests/lib_ini_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-BASIC_FAILED=$(bash tests/lib_ini_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
-
-EXTENDED_TOTAL=$(bash tests/lib_ini_extended_tests.sh 2>&1 | grep -oP 'Total extended tests executed: \K\d+' || echo "0")
-EXTENDED_PASSED=$(bash tests/lib_ini_extended_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-EXTENDED_FAILED=$(bash tests/lib_ini_extended_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
-
-ENV_TOTAL=$(bash tests/test_env_override.sh 2>&1 | grep -oP 'Total environment override tests executed: \K\d+' || echo "0")
-ENV_PASSED=$(bash tests/test_env_override.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-ENV_FAILED=$(bash tests/test_env_override.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
-
-SECURITY_TOTAL=$(bash tests/lib_ini_security_tests.sh 2>&1 | grep -oP 'Total security tests executed: \K\d+' || echo "0")
-SECURITY_PASSED=$(bash tests/lib_ini_security_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-SECURITY_FAILED=$(bash tests/lib_ini_security_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
-
-ADVANCED_TOTAL=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP 'Total advanced features tests executed: \K\d+' || echo "0")
-ADVANCED_PASSED=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-ADVANCED_FAILED=$(bash tests/lib_ini_advanced_features_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
-
-BOM_TOTAL=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Total BOM tests executed: \K\d+' || echo "0")
-BOM_PASSED=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Tests passed: \K\d+' || echo "0")
-BOM_FAILED=$(bash tests/lib_ini_bom_tests.sh 2>&1 | grep -oP 'Tests failed: \K\d+' || echo "0")
+# Run all test suites (each only once)
+run_suite "BASIC" "tests/lib_ini_tests.sh" "Total tests executed"
+echo ""
+run_suite "EXTENDED" "tests/lib_ini_extended_tests.sh" "Total extended tests executed"
+echo ""
+run_suite "ENV" "tests/test_env_override.sh" "Total environment override tests executed"
+echo ""
+run_suite "SECURITY" "tests/lib_ini_security_tests.sh" "Total security tests executed"
+echo ""
+run_suite "ADVANCED" "tests/lib_ini_advanced_features_tests.sh" "Total advanced features tests executed"
+echo ""
+run_suite "BOM" "tests/lib_ini_bom_tests.sh" "Total BOM tests executed"
 
 # Calculate totals
 TOTAL_TESTS=$((BASIC_TOTAL + EXTENDED_TOTAL + ENV_TOTAL + SECURITY_TOTAL + ADVANCED_TOTAL + BOM_TOTAL))
@@ -88,16 +65,17 @@ echo -e "BOM support tests:  ${BOM_TOTAL} executed, ${GREEN}${BOM_PASSED} passed
 echo -e "${YELLOW}-------------------------------------${NC}"
 echo -e "Total:              ${TOTAL_TESTS} executed, ${GREEN}${TOTAL_PASSED} passed${NC}, ${RED}${TOTAL_FAILED} failed${NC}"
 
-if [ $BASIC_EXIT -eq 0 ] && [ $EXTENDED_EXIT -eq 0 ] && [ $ENV_OVERRIDE_EXIT -eq 0 ] && [ $SECURITY_EXIT -eq 0 ] && [ $ADVANCED_EXIT -eq 0 ] && [ $BOM_EXIT -eq 0 ]; then
+if [ $BASIC_EXIT -eq 0 ] && [ $EXTENDED_EXIT -eq 0 ] && [ $ENV_EXIT -eq 0 ] && [ $SECURITY_EXIT -eq 0 ] && [ $ADVANCED_EXIT -eq 0 ] && [ $BOM_EXIT -eq 0 ]; then
     echo -e "\n${GREEN}ALL TESTS PASSED!${NC}"
     exit 0
 else
     echo -e "\n${RED}SOME TESTS FAILED!${NC}"
     [ $BASIC_EXIT -ne 0 ] && echo -e "${RED}Basic tests failed.${NC}"
     [ $EXTENDED_EXIT -ne 0 ] && echo -e "${RED}Extended tests failed.${NC}"
-    [ $ENV_OVERRIDE_EXIT -ne 0 ] && echo -e "${RED}Environment override tests failed.${NC}"
+    [ $ENV_EXIT -ne 0 ] && echo -e "${RED}Environment override tests failed.${NC}"
     [ $SECURITY_EXIT -ne 0 ] && echo -e "${RED}Security tests failed.${NC}"
     [ $ADVANCED_EXIT -ne 0 ] && echo -e "${RED}Advanced features tests failed.${NC}"
     [ $BOM_EXIT -ne 0 ] && echo -e "${RED}BOM support tests failed.${NC}"
     exit 1
-fi 
+fi
+ 
