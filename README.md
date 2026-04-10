@@ -344,11 +344,12 @@ make test
 The test suite includes:
 - **Basic tests** (47 tests): Core functionality validation
 - **Extended tests** (24 tests): Advanced features like arrays and imports
-- **Environment override tests** (11 tests): Configuration option validation
+- **Environment override tests** (12 tests): Configuration option validation
 - **Security tests** (25 tests): Security and durability improvements
 - **Advanced features tests** (39 tests): New advanced features validation
+- **BOM support tests** (15 tests): UTF-8 BOM handling validation
 
-**Total: 146 tests** covering all library functionality, validated in both **Bash** and **Zsh**.
+**Total: 162 tests** covering all library functionality, validated in both **Bash** and **Zsh**.
 
 ### Running Tests
 
