@@ -6,7 +6,7 @@
 ![Stars](https://img.shields.io/github/stars/lsferreira42/bash-ini-parser.svg)
 ![Issues](https://img.shields.io/github/issues/lsferreira42/bash-ini-parser.svg)
 
-A robust shell script library for parsing and manipulating INI configuration files in Bash.
+A robust shell script library for parsing and manipulating INI configuration files in Bash and Zsh.
 
 ## Features
 
@@ -27,6 +27,7 @@ A robust shell script library for parsing and manipulating INI configuration fil
 - **Configurable behavior** through environment variables
 - **Security features** including path validation, file locking, and atomic operations
 - **Backwards compatible** with previous versions
+- **Zsh compatibility** with local emulation support
 
 ## Installation
 
@@ -40,6 +41,7 @@ source /path/to/lib_ini.sh
 
 ```bash
 #!/bin/bash
+# (Also works with #!/bin/zsh)
 source ./lib_ini.sh
 
 # Create a new INI file with sections and keys
@@ -346,7 +348,24 @@ The test suite includes:
 - **Security tests** (25 tests): Security and durability improvements
 - **Advanced features tests** (39 tests): New advanced features validation
 
-**Total: 146 tests** covering all library functionality.
+**Total: 146 tests** covering all library functionality, validated in both **Bash** and **Zsh**.
+
+### Running Tests
+
+Run tests for both shells:
+```bash
+make test
+```
+
+Run tests only for Bash:
+```bash
+make test-bash
+```
+
+Run tests only for Zsh:
+```bash
+make test-zsh
+```
 
 ## License
 

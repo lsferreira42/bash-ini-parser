@@ -15,11 +15,22 @@ lint:
 	@echo "Lint complete."
 
 # Run all tests
-test:
-	@echo "Running tests..."
+test: test-bash test-zsh
+	@echo "All tests complete."
+
+# Run bash tests
+test-bash:
+	@echo "Running Bash tests..."
 	@chmod +x run_tests.sh
 	@./run_tests.sh
-	@echo "Tests complete."
+	@echo "Bash tests complete."
+
+# Run zsh tests
+test-zsh:
+	@echo "Running Zsh tests..."
+	@chmod +x run_tests_zsh.sh
+	@./run_tests_zsh.sh
+	@echo "Zsh tests complete."
 
 # Alias for test
 tests: test

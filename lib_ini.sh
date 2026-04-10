@@ -27,7 +27,7 @@ declare -a _ini_lock_fds=()
 function _ini_cleanup_temp_files() {
     local file
     for file in "${_ini_temp_files[@]}"; do
-        [ -f "$file" ] && rm -f "$file" 2>/dev/null
+        [[ -f "$file" ]] && rm -f "$file" 2>/dev/null
     done
     _ini_temp_files=()
 }
@@ -36,7 +36,7 @@ function _ini_cleanup_temp_files() {
 function _ini_cleanup_locks() {
     local fd
     for fd in "${_ini_lock_fds[@]}"; do
-        [ -n "$fd" ] && exec {fd}>&- 2>/dev/null || true
+        [[ -n "$fd" ]] && exec {fd}>&- 2>/dev/null || true
     done
     _ini_lock_fds=()
 }
@@ -52,7 +52,7 @@ trap '_ini_cleanup_temp_files; _ini_cleanup_locks' EXIT
 
 # Print debug messages
 function ini_debug() {
-    if [ "${INI_DEBUG}" -eq 1 ]; then
+    if [[ "${INI_DEBUG}" -eq 1 ]]; then
         echo "[DEBUG] $1" >&2
     fi
 }
@@ -64,24 +64,29 @@ function ini_error() {
 
 # Validate section name
 function ini_validate_section_name() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local section="$1"
     
-    if [ -z "$section" ]; then
+    if [[ -z "$section" ]]; then
         ini_error "Section name cannot be empty"
         return 1
     fi
     
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         # Check for illegal characters in section name
-        if [[ "$section" =~ [\[\]\=] ]]; then
+        local illegal_re='[\[\]\=]'
+        if [[ "$section" =~ $illegal_re ]]; then
             ini_error "Section name contains illegal characters: $section"
             return 1
         fi
     fi
     
-    if [ "${INI_ALLOW_SPACES_IN_NAMES}" -eq 0 ] && [[ "$section" =~ [[:space:]] ]]; then
-        ini_error "Section name contains spaces: $section"
-        return 1
+    if [[ "${INI_ALLOW_SPACES_IN_NAMES}" -eq 0 ]]; then
+        local space_re='[[:space:]]'
+        if [[ "$section" =~ $space_re ]]; then
+            ini_error "Section name contains spaces: $section"
+            return 1
+        fi
     fi
     
     return 0
@@ -89,24 +94,29 @@ function ini_validate_section_name() {
 
 # Validate key name
 function ini_validate_key_name() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local key="$1"
     
-    if [ -z "$key" ]; then
+    if [[ -z "$key" ]]; then
         ini_error "Key name cannot be empty"
         return 1
     fi
     
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         # Check for illegal characters in key name
-        if [[ "$key" =~ [\[\]\=] ]]; then
+        local illegal_re='[\[\]\=]'
+        if [[ "$key" =~ $illegal_re ]]; then
             ini_error "Key name contains illegal characters: $key"
             return 1
         fi
     fi
     
-    if [ "${INI_ALLOW_SPACES_IN_NAMES}" -eq 0 ] && [[ "$key" =~ [[:space:]] ]]; then
-        ini_error "Key name contains spaces: $key"
-        return 1
+    if [[ "${INI_ALLOW_SPACES_IN_NAMES}" -eq 0 ]]; then
+        local space_re='[[:space:]]'
+        if [[ "$key" =~ $space_re ]]; then
+            ini_error "Key name contains spaces: $key"
+            return 1
+        fi
     fi
     
     return 0
@@ -114,18 +124,19 @@ function ini_validate_key_name() {
 
 # Create a secure temporary file
 function ini_create_temp_file() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     if (( $# < 1 )); then
         ini_error "ini_create_temp_file: missing variable name argument"
         return 1
     fi
-    local -n _ini_ctf_ref=$1
+    local _ini_ctf_var_name=$1
     local _ini_ctf_path
-    if ! _ini_ctf_path=$(mktemp "${TMPDIR:-/tmp}/ini_XXXXXXXXXX" 2>/dev/null) || [ -z "$_ini_ctf_path" ]; then
+    if ! _ini_ctf_path=$(mktemp "${TMPDIR:-/tmp}/ini_XXXXXXXXXX" 2>/dev/null) || [[ -z "$_ini_ctf_path" ]]; then
         ini_error "Failed to create temporary file"
         return 1
     fi
     _ini_temp_files+=("$_ini_ctf_path")
-    _ini_ctf_ref="$_ini_ctf_path"
+    eval "$_ini_ctf_var_name=\"\$_ini_ctf_path\""
 }
 
 # Trim whitespace from start and end of a string
@@ -145,14 +156,16 @@ function ini_escape_for_regex() {
 
 # Validate and normalize file path to prevent path traversal
 function ini_validate_path() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         return 1
     fi
     
     # Check for path traversal attempts
-    if [[ "$file" =~ \.\./ ]]; then
+    local traversal_re1='\.\./'
+    if [[ "$file" =~ $traversal_re1 ]]; then
         ini_error "Path traversal detected: $file"
         return 1
     fi
@@ -163,7 +176,8 @@ function ini_validate_path() {
         normalized=$(realpath -m "$file" 2>/dev/null || echo "$file")
         # realpath returns absolute paths, so .. in the middle is valid (e.g., /home/../home)
         # Only reject if .. appears at the start suggesting traversal
-        if [[ "$normalized" =~ ^\.\./ ]]; then
+        local traversal_re2='^\.\./'
+        if [[ "$normalized" =~ $traversal_re2 ]]; then
             ini_error "Invalid path after normalization: $normalized"
             return 1
         fi
@@ -175,7 +189,10 @@ function ini_validate_path() {
         
         # Additional check: ensure path doesn't escape expected boundaries
         # Only check for .. if it's part of a path traversal pattern
-        if [[ "$normalized" =~ \.\./ ]] || [[ "$normalized" =~ /\.\. ]] || [[ "$normalized" =~ ^\.\.$ ]]; then
+        local traversal_re3='\.\./'
+        local traversal_re4='/\.\.'
+        local traversal_re5='^\.\.$'
+        if [[ "$normalized" =~ $traversal_re3 ]] || [[ "$normalized" =~ $traversal_re4 ]] || [[ "$normalized" =~ $traversal_re5 ]]; then
             ini_error "Invalid path after normalization: $normalized"
             return 1
         fi
@@ -190,16 +207,16 @@ function ini_resolve_symlink() {
     local resolved
     
     # Check if file exists (even as symlink)
-    if [ ! -e "$file" ] && [ ! -L "$file" ]; then
+    if [[ ! -e "$file" ]] && [[ ! -L "$file" ]]; then
         echo "$file"
         return 0
     fi
     
     # Check if it's a symlink
-    if [ -L "$file" ]; then
+    if [[ -L "$file" ]]; then
         # Resolve symlink
         if command -v readlink >/dev/null 2>&1; then
-            if ! resolved=$(readlink -f "$file" 2>/dev/null) || [ -z "$resolved" ]; then
+            if ! resolved=$(readlink -f "$file" 2>/dev/null) || [[ -z "$resolved" ]]; then
                 ini_error "Failed to resolve symlink: $file"
                 return 1
             fi
@@ -221,7 +238,7 @@ function ini_resolve_symlink() {
 function ini_check_file_size() {
     local file="$1"
     
-    if [ ! -f "$file" ]; then
+    if [[ ! -f "$file" ]]; then
         return 0  # File doesn't exist yet, size check not needed
     fi
     
@@ -234,7 +251,7 @@ function ini_check_file_size() {
         size=$(wc -c < "$file" 2>/dev/null || echo "0")
     fi
     
-    if [ -n "$size" ] && [ "$size" -gt "${INI_MAX_FILE_SIZE}" ]; then
+    if [[ -n "$size" ]] && [[ "$size" -gt "${INI_MAX_FILE_SIZE}" ]]; then
         ini_error "File too large: $file (${size} bytes, max: ${INI_MAX_FILE_SIZE} bytes)"
         return 1
     fi
@@ -244,15 +261,17 @@ function ini_check_file_size() {
 
 # Validate environment variable name
 function ini_validate_env_var_name() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local name="$1"
     
-    if [ -z "$name" ]; then
+    if [[ -z "$name" ]]; then
         return 1
     fi
     
     # Nomes de variáveis devem começar com letra ou underscore
     # e conter apenas letras, números e underscores
-    if [[ ! "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    local env_name_re='^[a-zA-Z_][a-zA-Z0-9_]*$'
+    if [[ ! "$name" =~ $env_name_re ]]; then
         return 1
     fi
     
@@ -263,11 +282,13 @@ function ini_validate_env_var_name() {
 # BOM in UTF-8 is the byte sequence EF BB BF (appears as U+FEFF)
 # This function is safe to call on any line - it only removes BOM if present
 function _ini_remove_bom() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local line="$1"
     
     # Check if line starts with UTF-8 BOM (U+FEFF = \xEF\xBB\xBF)
     # In bash, we check for the BOM character directly
-    if [[ "$line" =~ ^$'\xEF\xBB\xBF' ]]; then
+    local bom_re=$'^\xEF\xBB\xBF'
+    if [[ "$line" =~ $bom_re ]]; then
         # Remove BOM from the beginning
         line="${line#$'\xEF\xBB\xBF'}"
         ini_debug "Removed UTF-8 BOM from line"
@@ -284,22 +305,22 @@ function ini_lock_file() {
         return 1
     fi
     local _ini_lf_file="$1"
-    local -n _ini_lf_ref=$2
+    local _ini_lf_var_name=$2
     local _ini_lf_lock_file="${_ini_lf_file}.lock"
     local _ini_lf_fd
     local _ini_lf_max_attempts=10
     local _ini_lf_attempt=0
     
     # Try to create lock file
-    while [ $_ini_lf_attempt -lt $_ini_lf_max_attempts ]; do
+    while [[ $_ini_lf_attempt -lt $_ini_lf_max_attempts ]]; do
         if exec {_ini_lf_fd}>"$_ini_lf_lock_file" 2>/dev/null; then
             # Try to obtain exclusive lock (timeout of 1 second per attempt)
             if flock -w 1 -x "$_ini_lf_fd" 2>/dev/null; then
                 _ini_lock_fds+=("$_ini_lf_fd")
-                _ini_lf_ref="$_ini_lf_fd"
+                eval "$_ini_lf_var_name=\"\$_ini_lf_fd\""
                 return 0
             else
-                exec {_ini_lf_fd}>&-
+                exec {_ini_lf_fd}>&- 2>/dev/null
             fi
         fi
         _ini_lf_attempt=$((_ini_lf_attempt + 1))
@@ -314,11 +335,12 @@ function ini_lock_file() {
 function ini_unlock_file() {
     local lock_fd="$1"
     
-    if [ -n "$lock_fd" ] && [ "$lock_fd" -ge 10 ] 2>/dev/null; then
+    if [[ -n "$lock_fd" ]] && [[ "$lock_fd" -ge 10 ]] 2>/dev/null; then
         flock -u "$lock_fd" 2>/dev/null || true
-        # Close file descriptor - use eval to handle dynamic fd
-        eval "exec $lock_fd>&-" 2>/dev/null || true
+        # Close file descriptor - use {fd}>&- syntax which is portable for dynamic FDs
+        exec {lock_fd}>&- 2>/dev/null || true
     fi
+    return 0
 }
 
 # ==============================================================================
@@ -329,7 +351,7 @@ function ini_check_file() {
     local file="$1"
     
     # Check if file parameter is provided
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "File path is required"
         return 1
     fi
@@ -342,17 +364,17 @@ function ini_check_file() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check file size if file exists
-    if [ -f "$resolved_file" ]; then
+    if [[ -f "$resolved_file" ]]; then
         ini_check_file_size "$resolved_file" || return 1
     fi
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_debug "File does not exist, attempting to create: $resolved_file"
         # Create directory if it doesn't exist
         local dir
         dir=$(dirname "$resolved_file")
-        if [ ! -d "$dir" ]; then
+        if [[ ! -d "$dir" ]]; then
             mkdir -p "$dir" 2>/dev/null || {
                 ini_error "Could not create directory: $dir"
                 return 1
@@ -368,7 +390,7 @@ function ini_check_file() {
     fi
     
     # Check if file is writable
-    if [ ! -w "$resolved_file" ]; then
+    if [[ ! -w "$resolved_file" ]]; then
         ini_error "File is not writable: $resolved_file"
         return 1
     fi
@@ -381,24 +403,25 @@ function ini_check_file() {
 # ==============================================================================
 
 function ini_read() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     local key="$3"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_read: Missing required parameters"
         return 1
     fi
     
     # Validate section and key names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
         ini_validate_key_name "$key" || return 1
     fi
     
     # Check if file exists
-    if [ ! -f "$file" ]; then
+    if [[ ! -f "$file" ]]; then
         ini_error "File not found: $file"
         return 1
     fi
@@ -417,13 +440,14 @@ function ini_read() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
         
         # Skip comments and empty lines
-        if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
+        local comment_re='^[[:space:]]*[#\;]'
+        if [[ -z "$line" || "$line" =~ $comment_re ]]; then
             continue
         fi
         
@@ -435,21 +459,23 @@ function ini_read() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             ini_debug "Reached end of section without finding key"
             return 1
         fi
         
         # Check for key in the current section
         if [[ $in_section -eq 1 ]]; then
-            local key_pattern="^[[:space:]]*${escaped_key}[[:space:]]*="
-            if [[ "$line" =~ $key_pattern ]]; then
+            local kp="^[[:space:]]*${escaped_key}[[:space:]]*="
+            if [[ "$line" =~ $kp ]]; then
                 local value="${line#*=}"
                 # Trim whitespace
                 value=$(ini_trim "$value")
                 
                 # Check for quoted values
-                if [[ "$value" =~ ^\"(.*)\"$ ]]; then
+                local qr='^\"(.*)\"$'
+                if [[ "$value" =~ $qr ]]; then
                     # Remove the quotes
                     value="${BASH_REMATCH[1]}"
                     # Handle escaped quotes within the value
@@ -468,10 +494,11 @@ function ini_read() {
 }
 
 function ini_list_sections() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_list_sections: Missing file parameter"
         return 1
     fi
@@ -484,7 +511,7 @@ function ini_list_sections() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -493,7 +520,7 @@ function ini_list_sections() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -506,13 +533,14 @@ function ini_list_sections() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
         
         # Check for section header
-        if [[ "$line" =~ ^\[([^]]+)\] ]]; then
+        local section_header_re='^\[([^]]+)\]'
+        if [[ "$line" =~ $section_header_re ]]; then
             echo "${BASH_REMATCH[1]}"
         fi
     done < "$file"
@@ -520,17 +548,18 @@ function ini_list_sections() {
 }
 
 function ini_list_keys() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]]; then
         ini_error "ini_list_keys: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -542,7 +571,7 @@ function ini_list_keys() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -551,7 +580,7 @@ function ini_list_keys() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -569,13 +598,14 @@ function ini_list_keys() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
         
         # Skip comments and empty lines
-        if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
+        local comment_re='^[[:space:]]*[#\;]'
+        if [[ -z "$line" || "$line" =~ $comment_re ]]; then
             continue
         fi
         
@@ -587,12 +617,14 @@ function ini_list_keys() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             break
         fi
         
         # Extract key name from current section
-        if [[ $in_section -eq 1 && "$line" =~ ^[[:space:]]*[^=]+= ]]; then
+        local key_name_re='^[[:space:]]*[^=]+='
+        if [[ $in_section -eq 1 && "$line" =~ $key_name_re ]]; then
             local key="${line%%=*}"
             key=$(ini_trim "$key")
             ini_debug "Found key: $key"
@@ -608,13 +640,13 @@ function ini_section_exists() {
     local section="$2"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]]; then
         ini_error "ini_section_exists: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -626,7 +658,7 @@ function ini_section_exists() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_debug "File not found: $resolved_file"
         return 1
     fi
@@ -635,7 +667,7 @@ function ini_section_exists() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -653,19 +685,20 @@ function ini_section_exists() {
     local found=0
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
         
         # Check for section header
-        if [[ "$line" =~ ^\[$escaped_section\] ]]; then
+        local sec_re="^\[$escaped_section\]"
+        if [[ "$line" =~ $sec_re ]]; then
             found=1
             break
         fi
     done < "$file"
     
-    if [ $found -eq 1 ]; then
+    if [[ $found -eq 1 ]]; then
         ini_debug "Section found: $section"
         return 0
     else
@@ -675,17 +708,18 @@ function ini_section_exists() {
 }
 
 function ini_add_section() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]]; then
         ini_error "ini_add_section: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -701,7 +735,7 @@ function ini_add_section() {
     ini_debug "Adding section '$section' to file: $file"
     
     # Add a newline if file is not empty
-    if [ -s "$file" ]; then
+    if [[ -s "$file" ]]; then
         echo "" >> "$file"
     fi
     
@@ -712,25 +746,26 @@ function ini_add_section() {
 }
 
 function ini_write() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     local key="$3"
     local value="$4"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_write: Missing required parameters"
         return 1
     fi
     
     # Validate section and key names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
         ini_validate_key_name "$key" || return 1
     fi
     
     # Check for empty value if not allowed
-    if [ -z "$value" ] && [ "${INI_ALLOW_EMPTY_VALUES}" -eq 0 ]; then
+    if [[ -z "$value" ]] && [[ "${INI_ALLOW_EMPTY_VALUES}" -eq 0 ]]; then
         ini_error "Empty values are not allowed"
         return 1
     fi
@@ -764,16 +799,17 @@ function ini_write() {
     ini_debug "Writing key '$key' with value '$value' to section '$section' in file: $file"
     
     # Special handling for values with quotes or special characters
-    if [ "${INI_STRICT}" -eq 1 ] && [[ "$value" =~ [[:space:]\"\'\`\&\|\<\>\;\$] ]]; then
+    local spec_chars_re='[[:space:]"'\''`&| <>;$]'
+    if [[ "${INI_STRICT}" -eq 1 ]] && [[ "$value" =~ $spec_chars_re ]]; then
         value="\"${value//\"/\\\"}\""
         ini_debug "Value contains special characters, quoting: $value"
     fi
     
     # Process the file line by line
     local first_line=1
-    while IFS= read -r line || [ -n "$line" ]; do
+    while IFS= read -r line || [[ -n "$line" ]]; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -786,9 +822,10 @@ function ini_write() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             # Add the key-value pair if we haven't found it yet
-            if [ $found_key -eq 0 ]; then
+            if [[ $found_key -eq 0 ]]; then
                 echo "$key=$value" >> "$temp_file"
                 found_key=1
             fi
@@ -807,13 +844,13 @@ function ini_write() {
     done < "$file"
     
     # Add the key-value pair if we're still in the section and haven't found it
-    if [ $in_section -eq 1 ] && [ $found_key -eq 0 ]; then
+    if [[ $in_section -eq 1 ]] && [[ $found_key -eq 0 ]]; then
         echo "$key=$value" >> "$temp_file"
     fi
     
     # Create backup before atomic operation
     local backup_file=""
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         backup_file="${file}.bak.$$"
         if ! cp "$file" "$backup_file" 2>/dev/null; then
             ini_error "Failed to create backup"
@@ -827,7 +864,7 @@ function ini_write() {
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         ini_error "Failed to atomically replace file"
         rm -f "$temp_file"
-        [ -f "$backup_file" ] && rm -f "$backup_file"
+        [[ -f "$backup_file" ]] && rm -f "$backup_file"
         ini_unlock_file "$lock_fd"
         return 1
     fi
@@ -835,12 +872,12 @@ function ini_write() {
     # Remove from temp files tracking since we successfully moved it
     local new_array=()
     for item in "${_ini_temp_files[@]}"; do
-        [ "$item" != "$temp_file" ] && new_array+=("$item")
+        [[ "$item" != "$temp_file" ]] && new_array+=("$item")
     done
     _ini_temp_files=("${new_array[@]}")
     
     # Clean up backup after successful operation
-    [ -f "$backup_file" ] && rm -f "$backup_file"
+    [[ -f "$backup_file" ]] && rm -f "$backup_file"
     
     # Release lock
     ini_unlock_file "$lock_fd"
@@ -850,17 +887,18 @@ function ini_write() {
 }
 
 function ini_remove_section() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]]; then
         ini_error "ini_remove_section: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -872,7 +910,7 @@ function ini_remove_section() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -881,7 +919,7 @@ function ini_remove_section() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -909,7 +947,7 @@ function ini_remove_section() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -921,19 +959,20 @@ function ini_remove_section() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             in_section=0
         fi
         
         # Write the line to the temp file if not in the section to be removed
-        if [ $in_section -eq 0 ]; then
+        if [[ $in_section -eq 0 ]]; then
             echo "$line" >> "$temp_file"
         fi
     done < "$file"
     
     # Create backup before atomic operation
     local backup_file=""
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         backup_file="${file}.bak.$$"
         if ! cp "$file" "$backup_file" 2>/dev/null; then
             ini_error "Failed to create backup"
@@ -947,7 +986,7 @@ function ini_remove_section() {
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         ini_error "Failed to atomically replace file"
         rm -f "$temp_file"
-        [ -f "$backup_file" ] && rm -f "$backup_file"
+        [[ -f "$backup_file" ]] && rm -f "$backup_file"
         ini_unlock_file "$lock_fd"
         return 1
     fi
@@ -955,12 +994,12 @@ function ini_remove_section() {
     # Remove from temp files tracking since we successfully moved it
     local new_array=()
     for item in "${_ini_temp_files[@]}"; do
-        [ "$item" != "$temp_file" ] && new_array+=("$item")
+        [[ "$item" != "$temp_file" ]] && new_array+=("$item")
     done
     _ini_temp_files=("${new_array[@]}")
     
     # Clean up backup after successful operation
-    [ -f "$backup_file" ] && rm -f "$backup_file"
+    [[ -f "$backup_file" ]] && rm -f "$backup_file"
     
     # Release lock
     ini_unlock_file "$lock_fd"
@@ -970,18 +1009,19 @@ function ini_remove_section() {
 }
 
 function ini_remove_key() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     local key="$3"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_remove_key: Missing required parameters"
         return 1
     fi
     
     # Validate section and key names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
         ini_validate_key_name "$key" || return 1
     fi
@@ -994,7 +1034,7 @@ function ini_remove_key() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -1003,7 +1043,7 @@ function ini_remove_key() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1035,7 +1075,7 @@ function ini_remove_key() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -1048,7 +1088,8 @@ function ini_remove_key() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             in_section=0
         fi
         
@@ -1063,7 +1104,7 @@ function ini_remove_key() {
     
     # Create backup before atomic operation
     local backup_file=""
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         backup_file="${file}.bak.$$"
         if ! cp "$file" "$backup_file" 2>/dev/null; then
             ini_error "Failed to create backup"
@@ -1077,7 +1118,7 @@ function ini_remove_key() {
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         ini_error "Failed to atomically replace file"
         rm -f "$temp_file"
-        [ -f "$backup_file" ] && rm -f "$backup_file"
+        [[ -f "$backup_file" ]] && rm -f "$backup_file"
         ini_unlock_file "$lock_fd"
         return 1
     fi
@@ -1085,12 +1126,12 @@ function ini_remove_key() {
     # Remove from temp files tracking since we successfully moved it
     local new_array=()
     for item in "${_ini_temp_files[@]}"; do
-        [ "$item" != "$temp_file" ] && new_array+=("$item")
+        [[ "$item" != "$temp_file" ]] && new_array+=("$item")
     done
     _ini_temp_files=("${new_array[@]}")
     
     # Clean up backup after successful operation
-    [ -f "$backup_file" ] && rm -f "$backup_file"
+    [[ -f "$backup_file" ]] && rm -f "$backup_file"
     
     # Release lock
     ini_unlock_file "$lock_fd"
@@ -1110,7 +1151,7 @@ function ini_get_or_default() {
     local default_value="$4"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_get_or_default: Missing required parameters"
         return 1
     fi
@@ -1121,7 +1162,7 @@ function ini_get_or_default() {
     local result=$?
     
     # Return the value or default
-    if [ $result -eq 0 ]; then
+    if [[ $result -eq 0 ]]; then
         echo "$value"
     else
         echo "$default_value"
@@ -1131,12 +1172,14 @@ function ini_get_or_default() {
 }
 
 function ini_import() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
+
     local source_file="$1"
     local target_file="$2"
     local import_sections=("${@:3}")
     
     # Validate parameters
-    if [ -z "$source_file" ] || [ -z "$target_file" ]; then
+    if [[ -z "$source_file" ]] || [[ -z "$target_file" ]]; then
         ini_error "ini_import: Missing required parameters"
         return 1
     fi
@@ -1150,7 +1193,7 @@ function ini_import() {
     resolved_source=$(ini_resolve_symlink "$source_file") || return 1
     
     # Check if source file exists
-    if [ ! -f "$resolved_source" ]; then
+    if [[ ! -f "$resolved_source" ]]; then
         ini_error "Source file not found: $resolved_source"
         return 1
     fi
@@ -1159,7 +1202,7 @@ function ini_import() {
     ini_check_file_size "$resolved_source" || return 1
     
     # Check if source file is readable
-    if [ ! -r "$resolved_source" ]; then
+    if [[ ! -r "$resolved_source" ]]; then
         ini_error "Source file is not readable: $resolved_source"
         return 1
     fi
@@ -1178,7 +1221,7 @@ function ini_import() {
     # Loop through sections
     for section in $sections; do
         # Skip if specific sections are provided and this one is not in the list
-        if [ ${#import_sections[@]} -gt 0 ] && ! [[ ${import_sections[*]} =~ $section ]]; then
+        if [[ ${#import_sections[@]} -gt 0 ]] && ! [[ ${import_sections[*]} =~ $section ]]; then
             ini_debug "Skipping section: $section"
             continue
         fi
@@ -1206,12 +1249,13 @@ function ini_import() {
 }
 
 function ini_to_env() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local prefix="$2"
     local section="$3"
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_to_env: Missing file parameter"
         return 1
     fi
@@ -1224,7 +1268,7 @@ function ini_to_env() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -1233,7 +1277,7 @@ function ini_to_env() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1243,8 +1287,8 @@ function ini_to_env() {
     ini_debug "Exporting INI values to environment variables with prefix: $prefix"
     
     # If section is specified, only export keys from that section
-    if [ -n "$section" ]; then
-        if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ -n "$section" ]]; then
+        if [[ "${INI_STRICT}" -eq 1 ]]; then
             ini_validate_section_name "$section" || return 1
         fi
         
@@ -1257,7 +1301,7 @@ function ini_to_env() {
             
             # Build variable name
             local var_name
-            if [ -n "$prefix" ]; then
+            if [[ -n "$prefix" ]]; then
                 var_name="${prefix}_${section}_${key}"
             else
                 var_name="${section}_${key}"
@@ -1290,7 +1334,7 @@ function ini_to_env() {
                 
                 # Build variable name
                 local var_name
-                if [ -n "$prefix" ]; then
+                if [[ -n "$prefix" ]]; then
                     var_name="${prefix}_${section}_${key}"
                 else
                     var_name="${section}_${key}"
@@ -1321,13 +1365,13 @@ function ini_key_exists() {
     local key="$3"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_key_exists: Missing required parameters"
         return 1
     fi
     
     # Validate section and key names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
         ini_validate_key_name "$key" || return 1
     fi
@@ -1340,7 +1384,7 @@ function ini_key_exists() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_debug "File not found: $resolved_file"
         return 1
     fi
@@ -1349,7 +1393,7 @@ function ini_key_exists() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1382,7 +1426,7 @@ function ini_read_array() {
     local key="$3"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_read_array: Missing required parameters"
         return 1
     fi
@@ -1401,10 +1445,10 @@ function ini_read_array() {
         local char="${value:$i:1}"
         
         # Handle quotes
-        if [ "$char" = '"' ]; then
+        if [[ "$char" = '"' ]]; then
 # shellcheck disable=SC1003
             # Check if the quote is escaped
-            if [ $i -gt 0 ] && [ "${value:$((i-1)):1}" = "\\" ]; then
+            if [[ $i -gt 0 ]] && [[ "${value:$((i-1)):1}" = "\\" ]]; then
                 # It's an escaped quote, keep it
                 current_item="${current_item:0:-1}$char"
             else
@@ -1412,7 +1456,7 @@ function ini_read_array() {
                 in_quotes=$((1 - in_quotes))
             fi
         # Handle comma separator
-        elif [ "$char" = ',' ] && [ $in_quotes -eq 0 ]; then
+        elif [[ "$char" = ',' ]] && [[ $in_quotes -eq 0 ]]; then
             # End of an item
             result+=("$(ini_trim "$current_item")")
             current_item=""
@@ -1423,7 +1467,7 @@ function ini_read_array() {
     done
     
     # Add the last item
-    if [ -n "$current_item" ] || [ ${#result[@]} -gt 0 ]; then
+    if [[ -n "$current_item" ]] || [[ ${#result[@]} -gt 0 ]]; then
         result+=("$(ini_trim "$current_item")")
     fi
     
@@ -1436,6 +1480,7 @@ function ini_read_array() {
 }
 
 function ini_write_array() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     local key="$3"
@@ -1443,7 +1488,7 @@ function ini_write_array() {
     local -a array_values=("$@")
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$key" ]]; then
         ini_error "ini_write_array: Missing required parameters"
         return 1
     fi
@@ -1454,7 +1499,7 @@ function ini_write_array() {
     
     for value in "${array_values[@]}"; do
         # Add comma separator if not the first item
-        if [ $first -eq 0 ]; then
+        if [[ $first -eq 0 ]]; then
             array_string="$array_string,"
         else
             first=0
@@ -1480,11 +1525,12 @@ function ini_write_array() {
 # ==============================================================================
 
 function ini_validate() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local errors=0
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_validate: Missing file parameter"
         return 1
     fi
@@ -1497,7 +1543,7 @@ function ini_validate() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -1506,7 +1552,7 @@ function ini_validate() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1521,9 +1567,9 @@ function ini_validate() {
     local sections_found=0
     local first_line=1
     
-    while IFS= read -r line || [ -n "$line" ]; do
+    while IFS= read -r line || [[ -n "$line" ]]; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -1533,18 +1579,20 @@ function ini_validate() {
         trimmed_line=$(ini_trim "$line")
         
         # Skip empty lines and comments
-        if [[ -z "$trimmed_line" || "$trimmed_line" =~ ^[[:space:]]*[#\;] ]]; then
+        local comment_re='^[[:space:]]*[#\;]'
+        if [[ -z "$trimmed_line" || "$trimmed_line" =~ $comment_re ]]; then
             continue
         fi
         
         # Check for section header
-        if [[ "$trimmed_line" =~ ^\[([^]]+)\]$ ]]; then
+        local section_header_re='^\[([^]]+)\]$'
+        if [[ "$trimmed_line" =~ $section_header_re ]]; then
             in_section=1
             last_section="${BASH_REMATCH[1]}"
             sections_found=$((sections_found + 1))
             
             # Validate section name if strict mode
-            if [ "${INI_STRICT}" -eq 1 ]; then
+            if [[ "${INI_STRICT}" -eq 1 ]]; then
                 if ! ini_validate_section_name "$last_section" >/dev/null 2>&1; then
                     ini_error "Line $line_num: Invalid section name: $last_section"
                     errors=$((errors + 1))
@@ -1554,8 +1602,9 @@ function ini_validate() {
         fi
         
         # Check for key=value pair
-        if [[ "$trimmed_line" =~ ^[[:space:]]*([^=]+)=(.*)$ ]]; then
-            if [ $in_section -eq 0 ]; then
+        local kv_pair_re='^[[:space:]]*([^=]+)=(.*)$'
+        if [[ "$trimmed_line" =~ $kv_pair_re ]]; then
+            if [[ $in_section -eq 0 ]]; then
                 ini_error "Line $line_num: Key-value pair outside of section: $trimmed_line"
                 errors=$((errors + 1))
             else
@@ -1563,7 +1612,7 @@ function ini_validate() {
                 key=$(ini_trim "$key")
                 
                 # Validate key name if strict mode
-                if [ "${INI_STRICT}" -eq 1 ]; then
+                if [[ "${INI_STRICT}" -eq 1 ]]; then
                     if ! ini_validate_key_name "$key" >/dev/null 2>&1; then
                         ini_error "Line $line_num: Invalid key name in section [$last_section]: $key"
                         errors=$((errors + 1))
@@ -1578,7 +1627,7 @@ function ini_validate() {
         errors=$((errors + 1))
     done < "$file"
     
-    if [ $errors -eq 0 ]; then
+    if [[ $errors -eq 0 ]]; then
         ini_debug "File validation passed: $file ($sections_found sections)"
         return 0
     else
@@ -1588,17 +1637,18 @@ function ini_validate() {
 }
 
 function ini_get_all() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]]; then
         ini_error "ini_get_all: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -1610,7 +1660,7 @@ function ini_get_all() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -1619,7 +1669,7 @@ function ini_get_all() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1637,13 +1687,14 @@ function ini_get_all() {
     local first_line=1
     while IFS= read -r line; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
         
         # Skip comments and empty lines
-        if [[ -z "$line" || "$line" =~ ^[[:space:]]*[#\;] ]]; then
+        local comment_re='^[[:space:]]*[#\;]'
+        if [[ -z "$line" || "$line" =~ $comment_re ]]; then
             continue
         fi
         
@@ -1655,19 +1706,22 @@ function ini_get_all() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             break
         fi
         
         # Extract key=value from current section
-        if [[ $in_section -eq 1 && "$line" =~ ^[[:space:]]*([^=]+)=(.*)$ ]]; then
+        local kv_extract_re='^[[:space:]]*([^=]+)=(.*)$'
+        if [[ $in_section -eq 1 && "$line" =~ $kv_extract_re ]]; then
             local key="${BASH_REMATCH[1]}"
             local value="${BASH_REMATCH[2]}"
             key=$(ini_trim "$key")
             value=$(ini_trim "$value")
             
             # Handle quoted values
-            if [[ "$value" =~ ^\"(.*)\"$ ]]; then
+            local quoted_val_re='^\"(.*)\"$'
+            if [[ "$value" =~ $quoted_val_re ]]; then
                 value="${BASH_REMATCH[1]}"
                 value="${value//\\\"/\"}"
             fi
@@ -1680,18 +1734,19 @@ function ini_get_all() {
 }
 
 function ini_rename_section() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local old_section="$2"
     local new_section="$3"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$old_section" ] || [ -z "$new_section" ]; then
+    if [[ -z "$file" ]] || [[ -z "$old_section" ]] || [[ -z "$new_section" ]]; then
         ini_error "ini_rename_section: Missing required parameters"
         return 1
     fi
     
     # Validate section names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$old_section" || return 1
         ini_validate_section_name "$new_section" || return 1
     fi
@@ -1737,9 +1792,9 @@ function ini_rename_section() {
     
     # Process the file line by line
     local first_line=1
-    while IFS= read -r line || [ -n "$line" ]; do
+    while IFS= read -r line || [[ -n "$line" ]]; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -1752,7 +1807,8 @@ function ini_rename_section() {
         fi
         
         # Check if we've moved to a different section
-        if [[ $in_section -eq 1 && "$line" =~ ^\[[^]]+\] ]]; then
+        local other_sec_re='^\[[^]]+\]'
+        if [[ $in_section -eq 1 && "$line" =~ $other_sec_re ]]; then
             in_section=0
         fi
         
@@ -1762,7 +1818,7 @@ function ini_rename_section() {
     
     # Create backup before atomic operation
     local backup_file=""
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         backup_file="${file}.bak.$$"
         if ! cp "$file" "$backup_file" 2>/dev/null; then
             ini_error "Failed to create backup"
@@ -1776,7 +1832,7 @@ function ini_rename_section() {
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         ini_error "Failed to atomically replace file"
         rm -f "$temp_file"
-        [ -f "$backup_file" ] && rm -f "$backup_file"
+        [[ -f "$backup_file" ]] && rm -f "$backup_file"
         ini_unlock_file "$lock_fd"
         return 1
     fi
@@ -1784,12 +1840,12 @@ function ini_rename_section() {
     # Remove from temp files tracking since we successfully moved it
     local new_array=()
     for item in "${_ini_temp_files[@]}"; do
-        [ "$item" != "$temp_file" ] && new_array+=("$item")
+        [[ "$item" != "$temp_file" ]] && new_array+=("$item")
     done
     _ini_temp_files=("${new_array[@]}")
     
     # Clean up backup after successful operation
-    [ -f "$backup_file" ] && rm -f "$backup_file"
+    [[ -f "$backup_file" ]] && rm -f "$backup_file"
     
     # Release lock
     ini_unlock_file "$lock_fd"
@@ -1799,19 +1855,21 @@ function ini_rename_section() {
 }
 
 function ini_rename_key() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
+
     local file="$1"
     local section="$2"
     local old_key="$3"
     local new_key="$4"
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ -z "$old_key" ] || [ -z "$new_key" ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ -z "$old_key" ]] || [[ -z "$new_key" ]]; then
         ini_error "ini_rename_key: Missing required parameters"
         return 1
     fi
     
     # Validate section and key names only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
         ini_validate_key_name "$old_key" || return 1
         ini_validate_key_name "$new_key" || return 1
@@ -1842,12 +1900,13 @@ function ini_rename_key() {
 }
 
 function ini_format() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local indent="${2:-0}"
     local sort_keys="${3:-0}"
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_format: Missing file parameter"
         return 1
     fi
@@ -1860,7 +1919,7 @@ function ini_format() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -1869,7 +1928,7 @@ function ini_format() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -1897,9 +1956,9 @@ function ini_format() {
     
     # First pass: collect all data
     local first_line=1
-    while IFS= read -r line || [ -n "$line" ]; do
+    while IFS= read -r line || [[ -n "$line" ]]; do
         # Remove BOM from first line if present
-        if [ "$first_line" -eq 1 ]; then
+        if [[ "$first_line" -eq 1 ]]; then
             line=$(_ini_remove_bom "$line")
             first_line=0
         fi
@@ -1908,13 +1967,14 @@ function ini_format() {
         trimmed_line=$(ini_trim "$line")
         
         # Handle comments
-        if [[ "$trimmed_line" =~ ^[[:space:]]*[#\;](.*)$ ]]; then
+        local comment_re='^[[:space:]]*[#\;](.*)$'
+        if [[ "$trimmed_line" =~ $comment_re ]]; then
             local comment="${BASH_REMATCH[1]}"
             comment=$(ini_trim "$comment")
-            if [ -z "$current_section" ]; then
+            if [[ -z "$current_section" ]]; then
                 comments_before_section+=("# $comment")
             else
-                if [ -z "$current_comment" ]; then
+                if [[ -z "$current_comment" ]]; then
                     current_comment="# $comment"
                 else
                     current_comment="$current_comment\n# $comment"
@@ -1924,10 +1984,11 @@ function ini_format() {
         fi
         
         # Handle section headers
-        if [[ "$trimmed_line" =~ ^\[([^]]+)\]$ ]]; then
+        local section_re='^\[([^]]+)\]$'
+        if [[ "$trimmed_line" =~ $section_re ]]; then
             # Save previous section if exists
-            if [ -n "$current_section" ] && [ ${#keys_in_section[@]} -gt 0 ]; then
-                if [ "$sort_keys" -eq 1 ]; then
+            if [[ -n "$current_section" ]] && [[ ${#keys_in_section[@]} -gt 0 ]]; then
+                if [[ "$sort_keys" -eq 1 ]]; then
                     # Sort by key name (extract key from key=value)
                     local sorted_array=()
                     for entry in "${keys_in_section[@]}"; do
@@ -1940,10 +2001,13 @@ function ini_format() {
                     done
                     local sorted_output
                     sorted_output=$(printf '%s\n' "${sorted_array[@]}" | sort -t'|' -k1 | cut -d'|' -f2-)
-                    IFS=$'\n' read -d '' -ra sorted_entries <<< "$sorted_output" || true
-                    keys_in_section=("${sorted_entries[@]}")
+                    local _ini_sorted_entries=()
+                    while IFS= read -r _ini_sline; do
+                        [[ -n "$_ini_sline" ]] && _ini_sorted_entries+=("$_ini_sline")
+                    done <<< "$sorted_output"
+                    keys_in_section=("${_ini_sorted_entries[@]}")
                 fi
-                section_keys["$current_section"]="${keys_in_section[*]}"
+                section_keys["$current_section"]=$(printf '%s\n' "${keys_in_section[@]}")
             fi
             
             current_section="${BASH_REMATCH[1]}"
@@ -1953,14 +2017,15 @@ function ini_format() {
         fi
         
         # Handle key=value pairs
-        if [[ "$trimmed_line" =~ ^[[:space:]]*([^=]+)=(.*)$ ]]; then
+        local kv_re='^[[:space:]]*([^=]+)=(.*)$'
+        if [[ "$trimmed_line" =~ $kv_re ]]; then
             local key="${BASH_REMATCH[1]}"
             local value="${BASH_REMATCH[2]}"
             key=$(ini_trim "$key")
             value=$(ini_trim "$value")
             
             local key_value="$key=$value"
-            if [ -n "$current_comment" ]; then
+            if [[ -n "$current_comment" ]]; then
                 key_value="$current_comment\n$key_value"
                 current_comment=""
             fi
@@ -1970,8 +2035,8 @@ function ini_format() {
     done < "$file"
     
     # Save last section
-    if [ -n "$current_section" ] && [ ${#keys_in_section[@]} -gt 0 ]; then
-        if [ "$sort_keys" -eq 1 ]; then
+    if [[ -n "$current_section" ]] && [[ ${#keys_in_section[@]} -gt 0 ]]; then
+        if [[ "$sort_keys" -eq 1 ]]; then
             # Sort by key name (extract key from key=value)
             local sorted_array=()
             for entry in "${keys_in_section[@]}"; do
@@ -1984,10 +2049,13 @@ function ini_format() {
             done
             local sorted_output
             sorted_output=$(printf '%s\n' "${sorted_array[@]}" | sort -t'|' -k1 | cut -d'|' -f2-)
-            IFS=$'\n' read -d '' -ra sorted_entries <<< "$sorted_output" || true
-            keys_in_section=("${sorted_entries[@]}")
+            local _ini_sorted_entries=()
+            while IFS= read -r _ini_sline; do
+                [[ -n "$_ini_sline" ]] && _ini_sorted_entries+=("$_ini_sline")
+            done <<< "$sorted_output"
+            keys_in_section=("${_ini_sorted_entries[@]}")
         fi
-        section_keys["$current_section"]="${keys_in_section[*]}"
+        section_keys["$current_section"]=$(printf '%s\n' "${keys_in_section[@]}")
     fi
     
     # Second pass: write formatted output
@@ -2003,35 +2071,36 @@ function ini_format() {
     local first_section=1
     for section in $all_sections; do
         # Add blank line before section (except first)
-        if [ $first_section -eq 0 ]; then
+        if [[ $first_section -eq 0 ]]; then
             echo "" >> "$temp_file"
         fi
         first_section=0
         
         # Write section header
         local indent_str=""
-        if [ "$indent" -gt 0 ]; then
+        if [[ "$indent" -gt 0 ]]; then
             indent_str=$(printf "%${indent}s" "")
         fi
         echo "${indent_str}[$section]" >> "$temp_file"
         
         # Write keys for this section
-        if [ -n "${section_keys[$section]}" ]; then
-            IFS=' ' read -ra keys_array <<< "${section_keys[$section]}"
-            for key_entry in "${keys_array[@]}"; do
+        if [[ -n "${section_keys["$section"]}" ]]; then
+            while IFS= read -r key_entry || [[ -n "$key_entry" ]]; do
+                [[ -z "$key_entry" ]] && continue
                 # Handle multi-line entries (with comments)
-                if [[ "$key_entry" =~ \\n ]]; then
+                local newline_re='\\n'
+                if [[ "$key_entry" =~ $newline_re ]]; then
                     echo -e "$key_entry" >> "$temp_file"
                 else
                     echo "$key_entry" >> "$temp_file"
                 fi
-            done
+            done <<< "${section_keys["$section"]}"
         fi
     done
     
     # Create backup before atomic operation
     local backup_file=""
-    if [ -f "$file" ]; then
+    if [[ -f "$file" ]]; then
         backup_file="${file}.bak.$$"
         if ! cp "$file" "$backup_file" 2>/dev/null; then
             ini_error "Failed to create backup"
@@ -2045,7 +2114,7 @@ function ini_format() {
     if ! mv "$temp_file" "$file" 2>/dev/null; then
         ini_error "Failed to atomically replace file"
         rm -f "$temp_file"
-        [ -f "$backup_file" ] && rm -f "$backup_file"
+        [[ -f "$backup_file" ]] && rm -f "$backup_file"
         ini_unlock_file "$lock_fd"
         return 1
     fi
@@ -2053,12 +2122,12 @@ function ini_format() {
     # Remove from temp files tracking since we successfully moved it
     local new_array=()
     for item in "${_ini_temp_files[@]}"; do
-        [ "$item" != "$temp_file" ] && new_array+=("$item")
+        [[ "$item" != "$temp_file" ]] && new_array+=("$item")
     done
     _ini_temp_files=("${new_array[@]}")
     
     # Clean up backup after successful operation
-    [ -f "$backup_file" ] && rm -f "$backup_file"
+    [[ -f "$backup_file" ]] && rm -f "$backup_file"
     
     # Release lock
     ini_unlock_file "$lock_fd"
@@ -2068,19 +2137,20 @@ function ini_format() {
 }
 
 function ini_batch_write() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local section="$2"
     shift 2
     local key_value_pairs=("$@")
     
     # Validate parameters
-    if [ -z "$file" ] || [ -z "$section" ] || [ ${#key_value_pairs[@]} -eq 0 ]; then
+    if [[ -z "$file" ]] || [[ -z "$section" ]] || [[ ${#key_value_pairs[@]} -eq 0 ]]; then
         ini_error "ini_batch_write: Missing required parameters"
         return 1
     fi
     
     # Validate section name only if strict mode is enabled
-    if [ "${INI_STRICT}" -eq 1 ]; then
+    if [[ "${INI_STRICT}" -eq 1 ]]; then
         ini_validate_section_name "$section" || return 1
     fi
     
@@ -2095,7 +2165,8 @@ function ini_batch_write() {
     # Process each key=value pair
     local errors=0
     for pair in "${key_value_pairs[@]}"; do
-        if [[ ! "$pair" =~ ^([^=]+)=(.*)$ ]]; then
+        local kv_re='^([^=]+)=(.*)$'
+        if [[ ! "$pair" =~ $kv_re ]]; then
             ini_error "Invalid key=value format: $pair"
             errors=$((errors + 1))
             continue
@@ -2107,7 +2178,7 @@ function ini_batch_write() {
         value=$(ini_trim "$value")
         
         # Validate key name if strict mode
-        if [ "${INI_STRICT}" -eq 1 ]; then
+        if [[ "${INI_STRICT}" -eq 1 ]]; then
             if ! ini_validate_key_name "$key" >/dev/null 2>&1; then
                 ini_error "Invalid key name: $key"
                 errors=$((errors + 1))
@@ -2121,7 +2192,7 @@ function ini_batch_write() {
         fi
     done
     
-    if [ $errors -eq 0 ]; then
+    if [[ $errors -eq 0 ]]; then
         ini_debug "Successfully batch wrote ${#key_value_pairs[@]} key-value pairs"
         return 0
     else
@@ -2131,19 +2202,21 @@ function ini_batch_write() {
 }
 
 function ini_merge() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local source_file="$1"
     local target_file="$2"
     local strategy="${3:-overwrite}"
     local merge_sections=("${@:4}")
     
     # Validate parameters
-    if [ -z "$source_file" ] || [ -z "$target_file" ]; then
+    if [[ -z "$source_file" ]] || [[ -z "$target_file" ]]; then
         ini_error "ini_merge: Missing required parameters"
         return 1
     fi
     
     # Validate strategy
-    if [[ ! "$strategy" =~ ^(overwrite|skip|merge)$ ]]; then
+    local strategy_re='^(overwrite|skip|merge)$'
+    if [[ ! "$strategy" =~ $strategy_re ]]; then
         ini_error "ini_merge: Invalid strategy. Must be 'overwrite', 'skip', or 'merge'"
         return 1
     fi
@@ -2157,7 +2230,7 @@ function ini_merge() {
     resolved_source=$(ini_resolve_symlink "$source_file") || return 1
     
     # Check if source file exists
-    if [ ! -f "$resolved_source" ]; then
+    if [[ ! -f "$resolved_source" ]]; then
         ini_error "Source file not found: $resolved_source"
         return 1
     fi
@@ -2166,7 +2239,7 @@ function ini_merge() {
     ini_check_file_size "$resolved_source" || return 1
     
     # Check if source file is readable
-    if [ ! -r "$resolved_source" ]; then
+    if [[ ! -r "$resolved_source" ]]; then
         ini_error "Source file is not readable: $resolved_source"
         return 1
     fi
@@ -2183,11 +2256,11 @@ function ini_merge() {
     sections=$(ini_list_sections "$source_file")
     
     # Filter sections if specific ones are provided
-    if [ ${#merge_sections[@]} -gt 0 ]; then
+    if [[ ${#merge_sections[@]} -gt 0 ]]; then
         local filtered_sections=""
         for section in $sections; do
             for merge_section in "${merge_sections[@]}"; do
-                if [ "$section" = "$merge_section" ]; then
+                if [[ "$section" = "$merge_section" ]]; then
                     filtered_sections="$filtered_sections $section"
                     break
                 fi
@@ -2219,14 +2292,14 @@ function ini_merge() {
             # Check if key exists in target
             local key_exists=0
             for target_key in $target_keys; do
-                if [ "$target_key" = "$key" ]; then
+                if [[ "$target_key" = "$key" ]]; then
                     key_exists=1
                     break
                 fi
             done
             
             # Apply merge strategy
-            if [ $key_exists -eq 1 ]; then
+            if [[ $key_exists -eq 1 ]]; then
                 case "$strategy" in
                     overwrite)
                         ini_write "$target_file" "$section" "$key" "$source_value"
@@ -2254,11 +2327,12 @@ function ini_merge() {
 }
 
 function ini_to_json() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local pretty="${2:-0}"
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_to_json: Missing file parameter"
         return 1
     fi
@@ -2271,7 +2345,7 @@ function ini_to_json() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -2280,7 +2354,7 @@ function ini_to_json() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -2304,7 +2378,7 @@ function ini_to_json() {
     }
     
     # Start JSON object
-    if [ "$pretty" -eq 1 ]; then
+    if [[ "$pretty" -eq 1 ]]; then
         echo "{"
     else
         echo -n "{"
@@ -2318,13 +2392,13 @@ function ini_to_json() {
         local escaped_section
         escaped_section=$(_ini_json_escape "$section")
         
-        if [ "$pretty" -eq 1 ]; then
-            if [ $first_section -eq 0 ]; then
+        if [[ "$pretty" -eq 1 ]]; then
+            if [[ $first_section -eq 0 ]]; then
                 echo ","
             fi
             echo "  \"$escaped_section\": {"
         else
-            if [ $first_section -eq 0 ]; then
+            if [[ $first_section -eq 0 ]]; then
                 echo -n ","
             fi
             echo -n "\"$escaped_section\":{"
@@ -2344,13 +2418,13 @@ function ini_to_json() {
             local escaped_value
             escaped_value=$(_ini_json_escape "$value")
             
-            if [ "$pretty" -eq 1 ]; then
-                if [ $first_key -eq 0 ]; then
+            if [[ "$pretty" -eq 1 ]]; then
+                if [[ $first_key -eq 0 ]]; then
                     echo ","
                 fi
                 echo "    \"$escaped_key\": \"$escaped_value\""
             else
-                if [ $first_key -eq 0 ]; then
+                if [[ $first_key -eq 0 ]]; then
                     echo -n ","
                 fi
                 echo -n "\"$escaped_key\":\"$escaped_value\""
@@ -2359,14 +2433,14 @@ function ini_to_json() {
             first_key=0
         done
         
-        if [ "$pretty" -eq 1 ]; then
+        if [[ "$pretty" -eq 1 ]]; then
             echo -n "  }"
         else
             echo -n "}"
         fi
     done
     
-    if [ "$pretty" -eq 1 ]; then
+    if [[ "$pretty" -eq 1 ]]; then
         echo ""
         echo "}"
     else
@@ -2377,11 +2451,12 @@ function ini_to_json() {
 }
 
 function ini_to_yaml() {
+    [[ -n "$ZSH_VERSION" ]] && emulate -L ksh && setopt BASH_REMATCH
     local file="$1"
     local indent="${2:-2}"
     
     # Validate parameters
-    if [ -z "$file" ]; then
+    if [[ -z "$file" ]]; then
         ini_error "ini_to_yaml: Missing file parameter"
         return 1
     fi
@@ -2394,7 +2469,7 @@ function ini_to_yaml() {
     resolved_file=$(ini_resolve_symlink "$file") || return 1
     
     # Check if file exists
-    if [ ! -f "$resolved_file" ]; then
+    if [[ ! -f "$resolved_file" ]]; then
         ini_error "File not found: $resolved_file"
         return 1
     fi
@@ -2403,7 +2478,7 @@ function ini_to_yaml() {
     ini_check_file_size "$resolved_file" || return 1
     
     # Check if file is readable
-    if [ ! -r "$resolved_file" ]; then
+    if [[ ! -r "$resolved_file" ]]; then
         ini_error "File is not readable: $resolved_file"
         return 1
     fi
@@ -2416,7 +2491,11 @@ function ini_to_yaml() {
     _ini_yaml_escape() {
         local str="$1"
         # Escape quotes and special characters if needed
-        if [[ "$str" =~ [:\"\'\[\]\{\}\|\&\*\#\?] ]] || [[ "$str" =~ ^[[:space:]] ]] || [[ "$str" =~ [[:space:]]$ ]]; then
+        # We use a character class for special characters, being careful with escaping
+        local special_chars_re='[:"'\''\[\]{}|&*#?]'
+        local leading_space_re='^[[:space:]]'
+        local trailing_space_re='[[:space:]]$'
+        if [[ "$str" =~ $special_chars_re ]] || [[ "$str" =~ $leading_space_re ]] || [[ "$str" =~ $trailing_space_re ]]; then
             str="\"${str//\"/\\\"}\""
         fi
         echo "$str"
@@ -2430,7 +2509,7 @@ function ini_to_yaml() {
         local escaped_section
         escaped_section=$(_ini_yaml_escape "$section")
         
-        if [ $first_section -eq 0 ]; then
+        if [[ $first_section -eq 0 ]]; then
             echo ""
         fi
         first_section=0
@@ -2458,9 +2537,9 @@ function ini_to_yaml() {
 }
 
 # Load additional modules if defined
-if [ -n "${INI_MODULES_DIR:-}" ] && [ -d "${INI_MODULES_DIR}" ]; then
+if [[ -n "${INI_MODULES_DIR:-}" ]] && [[ -d "${INI_MODULES_DIR}" ]]; then
     for module in "${INI_MODULES_DIR}"/*.sh; do
-        if [ -f "$module" ] && [ -r "$module" ]; then
+        if [[ -f "$module" ]] && [[ -r "$module" ]]; then
             # shellcheck disable=SC1090,SC1091
             source "$module"
         fi
